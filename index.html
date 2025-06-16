@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,8 +35,8 @@
             }
             /* Make sidebars scrollable if content overflows */
             #control-panel, #rule-editor-panel {
-                max-height: none; /* Allow panels to expand/collapse with content */
-                overflow-y: visible; /* Handled by panel-content now */
+                max-height: 40vh; /* Limit height to prevent excessive scrolling */
+                overflow-y: auto;
             }
             #main-canvas-area {
                 min-height: 300px; /* Ensure canvas area has a minimum visible height */
@@ -65,43 +66,9 @@
         .panel {
             @apply bg-gray-800 p-4 rounded-lg shadow-lg flex flex-col gap-4;
         }
-        .panel-header {
-            @apply border-b border-gray-700 pb-2 mb-2 flex justify-between items-center;
+        .section-title {
+            @apply text-lg font-semibold text-blue-400 mb-2;
         }
-        .panel-header .section-title {
-            @apply mb-0; /* Remove default margin-bottom from section-title */
-        }
-        .panel-toggle-btn {
-            @apply text-gray-400 hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 rounded;
-        }
-        /* Panel content for responsive collapse/expand */
-        @media (max-width: 1024px) {
-            .panel-content {
-                max-height: 0;
-                overflow: hidden;
-                transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-                padding-top: 0;
-                padding-bottom: 0;
-                /* Adjust padding-left/right if needed to match header */
-                margin-left: -1rem; /* Counteract panel's padding-left */
-                margin-right: -1rem; /* Counteract panel's padding-right */
-                padding-left: 1rem; /* Restore content padding */
-                padding-right: 1rem; /* Restore content padding */
-                display: flex; /* Ensure flex layout for children */
-                flex-direction: column;
-                gap: 1rem; /* Restore gap for children */
-            }
-            .panel-content.expanded {
-                max-height: 40vh; /* Limit height when expanded on mobile */
-                padding-top: 1rem;
-                padding-bottom: 1rem;
-            }
-            /* Override default panel padding for collapsed state, keep for header */
-            #control-panel, #rule-editor-panel {
-                padding: 1rem;
-            }
-        }
-
         .btn {
             @apply bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200;
         }
@@ -136,78 +103,7 @@
             max-width: 100%; /* Ensures canvas scales down to fit parent horizontally */
             max-height: 100%; /* Ensures canvas scales down to fit parent vertically */
             image-rendering: pixelated; /* For sharp pixel rendering when zoomed */
-            cursor: grab; /* Default cursor for panning */
-        }
-        canvas.grabbing {
-            cursor: grabbing;
-        }
-        /* Custom styles for rule builder checkboxes to make them look like toggles/buttons */
-        .rule-checkbox-item {
-            @apply flex items-center justify-center p-2 rounded-md border border-gray-600 bg-gray-700 cursor-pointer transition-colors duration-150;
-        }
-        .rule-checkbox-item input[type="checkbox"] {
-            @apply hidden; /* Hide default checkbox */
-        }
-        .rule-checkbox-item span {
-            @apply text-gray-300 font-medium text-sm;
-        }
-        .rule-checkbox-item input[type="checkbox"]:checked + span {
-            @apply text-blue-300; /* Text color when checked */
-        }
-        .rule-checkbox-item input[type="checkbox"]:checked {
-            @apply bg-blue-600 border-blue-500; /* Background/border when checked */
-        }
-        .rule-checkbox-item:hover {
-            @apply bg-gray-600; /* Hover effect */
-        }
-        .rule-checkbox-item input[type="checkbox"]:checked:hover {
-            @apply bg-blue-700; /* Hover effect when checked */
-        }
-        /* Add focus styles for accessibility */
-        .rule-checkbox-item:focus-within {
-            @apply ring-2 ring-blue-500 ring-opacity-75;
-        }
-
-        /* Modal specific styles for animation */
-        .modal-overlay {
-            @apply fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out;
-        }
-        .modal-content {
-            @apply bg-gray-800 p-6 rounded-lg shadow-xl w-96 transform transition-transform duration-300 ease-in-out scale-95;
-        }
-        .modal-overlay.show {
-            @apply opacity-100;
-        }
-        .modal-overlay.show .modal-content {
-            @apply scale-100;
-        }
-        .modal-overlay.hidden {
-            @apply opacity-0 pointer-events-none; /* Hide and disable interactions when fully faded out */
-        }
-        .modal-overlay.hidden .modal-content {
-            @apply scale-95;
-        }
-
-        /* Toast Notification Styles */
-        .toast {
-            @apply bg-gray-900 text-white px-4 py-2 rounded-md shadow-lg opacity-0 transform translate-y-4 transition-all duration-300 ease-out;
-            min-width: 200px;
-            text-align: center;
-        }
-        .toast.show {
-            @apply opacity-100 translate-y-0;
-        }
-        .toast.hide {
-            @apply opacity-0 translate-y-4;
-        }
-        .toast.success {
-            @apply bg-green-600;
-        }
-        .toast.error {
-            @apply bg-red-600;
-        }
-        .toast.info {
-            @apply bg-blue-600;
+            image-rendering: crisp-edges; /* Alternative for pixelated rendering */
         }
     </style>
 </head>
@@ -215,67 +111,39 @@
     <div id="app" class="min-h-screen">
         <!-- Left Sidebar: Control Panel -->
         <aside id="control-panel" class="panel">
-            <div class="panel-header">
-                <h2 class="section-title">Simulation Controls</h2>
-                <button class="panel-toggle-btn lg:hidden" aria-label="Toggle Simulation Controls Panel">
-                    <svg class="w-6 h-6 transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
+            <h2 class="section-title">Simulation Controls</h2>
+            <div class="flex gap-2">
+                <button id="playPauseBtn" class="btn flex-1" aria-label="Play or Pause Simulation">Play</button>
+                <button id="stepBtn" class="btn-secondary" aria-label="Step one generation forward">Step</button>
+                <button id="resetBtn" class="btn-secondary" aria-label="Reset simulation grid">Reset</button>
             </div>
-            <div class="panel-content">
-                <div class="flex gap-2">
-                    <button id="playPauseBtn" class="btn flex-1" aria-label="Play or Pause Simulation">Play</button>
-                    <button id="stepBtn" class="btn-secondary" aria-label="Step one generation forward">Step</button>
-                    <button id="resetBtn" class="btn-secondary" aria-label="Reset simulation grid">Reset</button>
-                </div>
-                <!-- New: Undo/Redo Buttons -->
-                <div class="flex gap-2">
-                    <button id="undoBtn" class="btn-secondary flex-1" aria-label="Undo last generation or drawing action" disabled>Undo</button>
-                    <button id="redoBtn" class="btn-secondary flex-1" aria-label="Redo next generation or drawing action" disabled>Redo</button>
-                </div>
-                <div>
-                    <label for="speedSlider" class="slider-label">Speed: <span id="speedValue">10x</span></label>
-                    <input type="range" id="speedSlider" min="1" max="60" value="10" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="10 generations per second">
-                </div>
+            <div>
+                <label for="speedSlider" class="slider-label">Speed: <span id="speedValue">10x</span></label>
+                <input type="range" id="speedSlider" min="1" max="60" value="10" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="10 generations per second">
+            </div>
 
-                <h2 class="section-title">Grid Dimensions</h2>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label for="gridWidthInput" class="slider-label">Width:</label>
-                        <input type="number" id="gridWidthInput" value="100" min="10" max="500" class="input-field" aria-label="Grid width">
-                    </div>
-                    <div>
-                        <label for="gridHeightInput" class="slider-label">Height:</label>
-                        <input type="number" id="gridHeightInput" value="100" min="10" max="500" class="input-field" aria-label="Grid height">
-                    </div>
-                </div>
-                <button id="applyGridSizeBtn" class="btn-secondary" aria-label="Apply new grid dimensions">Apply Grid Size</button>
+            <h2 class="section-title">Drawing Tools</h2>
+            <div>
+                <label for="brushSizeSlider" class="slider-label">Brush Size: <span id="brushSizeValue">1</span></label>
+                <input type="range" id="brushSizeSlider" min="1" max="5" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="1 pixel brush size">
+            </div>
+            <div class="flex gap-2">
+                <button id="fillGridBtn" class="btn-secondary flex-1" aria-label="Fill entire grid with live cells">Fill Grid</button>
+                <button id="clearGridBtn" class="btn-secondary flex-1" aria-label="Clear all cells from grid">Clear Grid</button>
+            </div>
 
-
-                <h2 class="section-title">Drawing Tools</h2>
-                <div>
-                    <label for="brushSizeSlider" class="slider-label">Brush Size: <span id="brushSizeValue">1</span></label>
-                    <input type="range" id="brushSizeSlider" min="1" max="5" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="1 pixel brush size">
-                </div>
-                <div class="flex gap-2">
-                    <button id="fillGridBtn" class="btn-secondary flex-1" aria-label="Fill entire grid with live cells">Fill Grid</button>
-                    <button id="clearGridBtn" class="btn-secondary flex-1" aria-label="Clear all cells from grid">Clear Grid</button>
-                </div>
-                <button id="randomizeGridBtn" class="btn-secondary" aria-label="Randomize grid with live and dead cells">Randomize Grid</button>
-
-
-                <h2 class="section-title">Pattern Presets</h2>
-                <select id="presetSelect" class="input-field" aria-label="Select a predefined pattern to load">
-                    <option value="">Select a preset...</option>
-                    <option value="glider">Glider (Conway)</option>
-                    <option value="lightWeightSpaceship">Light-weight Spaceship (Conway)</option>
-                    <option value="gosperGliderGun">Gosper Glider Gun (Conway)</option>
-                    <option value="pulsar">Pulsar (Conway)</option>
-                    <option value="tenCellRow">10 Cell Row (Conway)</option>
-                </select>
-                <div class="flex gap-2">
-                    <button id="savePatternBtn" class="btn-secondary flex-1" aria-label="Save current pattern to local storage">Save Pattern</button>
-                    <button id="loadPatternBtn" class="btn-secondary flex-1" aria-label="Load a pattern from local storage">Load Pattern</button>
-                </div>
+            <h2 class="section-title">Pattern Presets</h2>
+            <select id="presetSelect" class="input-field" aria-label="Select a predefined pattern to load">
+                <option value="">Select a preset...</option>
+                <option value="glider">Glider (Conway)</option>
+                <option value="lightWeightSpaceship">Light-weight Spaceship (Conway)</option>
+                <option value="gosperGliderGun">Gosper Glider Gun (Conway)</option>
+                <option value="pulsar">Pulsar (Conway)</option>
+                <option value="tenCellRow">10 Cell Row (Conway)</option>
+            </select>
+            <div class="flex gap-2">
+                <button id="savePatternBtn" class="btn-secondary flex-1" aria-label="Save current pattern to local storage">Save Pattern</button>
+                <button id="loadPatternBtn" class="btn-secondary flex-1" aria-label="Load a pattern from local storage">Load Pattern</button>
             </div>
         </aside>
 
@@ -286,91 +154,65 @@
 
         <!-- Right Sidebar: Rule Editor & Visual Settings -->
         <aside id="rule-editor-panel" class="panel">
-            <div class="panel-header">
-                <h2 class="section-title">Cellular Automata Rules</h2>
-                <button class="panel-toggle-btn lg:hidden" aria-label="Toggle Rule Editor Panel">
-                    <svg class="w-6 h-6 transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
+            <h2 class="section-title">Cellular Automata Rules</h2>
+            <div>
+                <label for="ruleInput" class="slider-label">Rule (B/S notation):</label>
+                <input type="text" id="ruleInput" value="B13/S23" class="input-field" aria-label="Cellular automata rule in B slash S notation, e.g., B3/S23 for Game of Life">
+                <p class="text-xs text-gray-400 mt-1">Example: B13/S23 (Dakota's Game of Life)</p>
             </div>
-            <div class="panel-content">
-                <div>
-                    <label for="ruleInput" class="slider-label">Rule (B/S notation):</label>
-                    <input type="text" id="ruleInput" value="B3/S23" class="input-field" aria-label="Cellular automata rule in B slash S notation, e.g., B3/S23 for Game of Life" placeholder="e.g., B3/S23 (Conway's Game of Life)">
-                    <p class="text-xs text-gray-400 mt-1">Example: B3/S23 (Conway's Game of Life)</p>
-                </div>
 
-                <h3 class="font-semibold text-gray-300 mt-2">Neighborhood Type:</h3>
-                <div class="flex gap-4 mt-1">
-                    <label class="checkbox-label">
-                        <input type="radio" name="neighborhoodType" value="moore" checked class="form-radio" aria-label="Moore neighborhood type (8 surrounding cells)">
-                        <span class="ml-2">Moore (8 neighbors)</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="radio" name="neighborhoodType" value="vonNeumann" class="form-radio" aria-label="Von Neumann neighborhood type (4 adjacent cells)">
-                        <span class="ml-2">Von Neumann (4 neighbors)</span>
-                    </label>
-                </div>
-
-                <!-- New: Boundary Type -->
-                <h3 class="font-semibold text-gray-300 mt-2">Boundary Type:</h3>
-                <div class="flex gap-4 mt-1">
-                    <label class="checkbox-label">
-                        <input type="radio" name="boundaryType" value="toroidal" checked class="form-radio" aria-label="Toroidal boundary (wrap-around)">
-                        <span class="ml-2">Toroidal (Wrap-around)</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="radio" name="boundaryType" value="finite" class="form-radio" aria-label="Finite boundary (no wrap-around)">
-                        <span class="ml-2">Finite (No wrap)</span>
-                    </label>
-                </div>
-
-                <h3 class="font-semibold text-gray-300 mt-2">Visual Rule Builder:</h3>
-                <div class="grid grid-cols-3 gap-2 text-sm">
-                    <div class="font-semibold text-blue-300 col-span-3">Birth Conditions (dead cell becomes alive):</div>
-                    <div id="birthConditions" class="col-span-3 grid grid-cols-5 gap-2" role="group" aria-labelledby="birth-conditions-title">
-                        <!-- Checkboxes for 0-8 will be generated here by JavaScript -->
-                    </div>
-                    <div class="font-semibold text-blue-300 col-span-3 mt-2">Survival Conditions (alive cell remains alive):</div>
-                    <div id="survivalConditions" class="col-span-3 grid grid-cols-5 gap-2" role="group" aria-labelledby="survival-conditions-title">
-                        <!-- Checkboxes for 0-8 will be generated here by JavaScript -->
-                    </div>
-                </div>
-
-                <h2 class="section-title mt-4">Visual Settings</h2>
-                <div>
-                    <label class="color-picker-label">
-                        Alive Cell Color:
-                        <input type="color" id="aliveColorPicker" value="#00FF00" class="color-picker-input" aria-label="Color for alive cells">
-                    </label>
-                </div>
-                <div>
-                    <label class="color-picker-label">
-                        Dying Cell Color:
-                        <input type="color" id="dyingColorPicker" value="#FF8C00" class="color-picker-input" aria-label="Color for dying cells">
-                    </label>
-                </div>
-                <div>
-                    <label class="color-picker-label">
-                        Dead Cell Color:
-                        <input type="color" id="deadColorPicker" value="#000000" class="color-picker-input" aria-label="Color for dead cells">
-                    </label>
-                </div>
-                <div>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="gridLinesToggle" checked class="form-checkbox" aria-label="Toggle grid lines visibility">
-                        <span class="ml-2">Show Grid Lines</span>
-                    </label>
-                </div>
-                <div>
-                    <label for="zoomSlider" class="slider-label">Zoom: <span id="zoomValue">1.0x</span></label>
-                    <input type="range" id="zoomSlider" min="0.5" max="5" step="0.1" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="1 times zoom">
-                </div>
-                <button id="shareLinkBtn" class="btn-secondary" aria-label="Generate shareable link for current state">Share Current State</button>
+            <h3 class="font-semibold text-gray-300 mt-2">Neighborhood Type:</h3>
+            <div class="flex gap-4 mt-1">
+                <label class="checkbox-label">
+                    <input type="radio" name="neighborhoodType" value="moore" checked class="form-radio" aria-label="Moore neighborhood type (8 surrounding cells)">
+                    <span class="ml-2">Moore (8 neighbors)</span>
+                </label>
+                <label class="checkbox-label">
+                    <input type="radio" name="neighborhoodType" value="vonNeumann" class="form-radio" aria-label="Von Neumann neighborhood type (4 adjacent cells)">
+                    <span class="ml-2">Von Neumann (4 neighbors)</span>
+                </label>
             </div>
+
+            <h3 class="font-semibold text-gray-300 mt-2">Visual Rule Builder:</h3>
+            <div class="grid grid-cols-3 gap-2 text-sm">
+                <div class="font-semibold text-blue-300 col-span-3">Birth Conditions (number of live neighbors for a dead cell to become alive):</div>
+                <div id="birthConditions" class="col-span-3 grid grid-cols-5 gap-2" role="group" aria-labelledby="birth-conditions-title">
+                    <!-- Checkboxes for 0-8 will be generated here by JavaScript -->
+                </div>
+                <div class="font-semibold text-blue-300 col-span-3 mt-2">Survival Conditions (number of live neighbors for a live cell to remain alive):</div>
+                <div id="survivalConditions" class="col-span-3 grid grid-cols-5 gap-2" role="group" aria-labelledby="survival-conditions-title">
+                    <!-- Checkboxes for 0-8 will be generated here by JavaScript -->
+                </div>
+            </div>
+
+            <h2 class="section-title mt-4">Visual Settings</h2>
+            <div>
+                <label class="color-picker-label">
+                    Alive Cell Color:
+                    <input type="color" id="aliveColorPicker" value="#00FF00" class="color-picker-input" aria-label="Color for alive cells">
+                </label>
+            </div>
+            <div>
+                <label class="color-picker-label">
+                    Dead Cell Color:
+                    <input type="color" id="deadColorPicker" value="#000000" class="color-picker-input" aria-label="Color for dead cells">
+                </label>
+            </div>
+            <div>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="gridLinesToggle" checked class="form-checkbox" aria-label="Toggle grid lines visibility">
+                    <span class="ml-2">Show Grid Lines</span>
+                </label>
+            </div>
+            <div>
+                <label for="zoomSlider" class="slider-label">Zoom: <span id="zoomValue">1.0x</span></label>
+                <input type="range" id="zoomSlider" min="0.5" max="5" step="0.1" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="1 times zoom">
+            </div>
+            <button id="shareLinkBtn" class="btn-secondary" aria-label="Generate shareable link for current state">Share Current State</button>
         </aside>
 
         <!-- Bottom: Status Bar -->
-        <footer id="status-bar" class="bg-gray-800 p-3 rounded-lg shadow-lg flex justify-around items-center text-sm font-semibold" aria-live="polite" aria-atomic="true">
+        <footer id="status-bar" class="bg-gray-800 p-3 rounded-lg shadow-lg flex justify-around items-center text-sm font-semibold">
             <span>Generation: <span id="generationCount">0</span></span>
             <span>Live Cells: <span id="liveCellCount">0</span></span>
             <span>FPS: <span id="fpsCount">0</span></span>
@@ -378,8 +220,8 @@
     </div>
 
     <!-- Modals for saved patterns -->
-    <div id="loadPatternModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="loadPatternModalTitle">
-        <div class="modal-content">
+    <div id="loadPatternModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="loadPatternModalTitle">
+        <div class="bg-gray-800 p-6 rounded-lg shadow-xl w-96">
             <h3 id="loadPatternModalTitle" class="text-xl font-semibold mb-4">Load Saved Pattern</h3>
             <div id="modalSavedPatternsList" class="max-h-60 overflow-y-auto mb-4 bg-gray-700 p-2 rounded">
                 <p class="text-gray-400">No saved patterns found.</p>
@@ -390,33 +232,16 @@
         </div>
     </div>
 
-    <!-- New Modal for Saving Pattern -->
-    <div id="savePatternModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="savePatternModalTitle">
-        <div class="modal-content">
-            <h3 id="savePatternModalTitle" class="text-xl font-semibold mb-4">Save Current Pattern</h3>
-            <input type="text" id="savePatternNameInput" class="input-field mb-4" placeholder="Enter pattern name" aria-label="Enter name for the pattern to save">
-            <div class="flex justify-end gap-2">
-                <button id="cancelSavePatternBtn" class="btn-secondary" aria-label="Cancel saving pattern">Cancel</button>
-                <button id="confirmSavePatternBtn" class="btn" aria-label="Confirm saving pattern">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notification Container -->
-    <div id="toastContainer" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none">
-        <!-- Toasts will be injected here -->
-    </div>
-
 
     <script>
         // Encapsulate all application logic within an immediately invoked function expression (IIFE)
         // to prevent global scope pollution.
         (function() {
             // --- Configuration Constants ---
+            const GRID_WIDTH = 100; // Fixed width of the cellular automaton grid
+            const GRID_HEIGHT = 100; // Fixed height of the cellular automaton grid
             const BASE_CELL_SIZE_PX = 8; // Base pixel size for a cell before any zoom is applied
             const LOCAL_STORAGE_KEY = 'cellularCosmosPatterns'; // Key for storing user patterns in local storage
-            const MAX_HISTORY_SIZE = 50; // Max number of grid states to store for undo/redo
-            const TOAST_DISPLAY_TIME = 3000; // Milliseconds for toast to display
 
             // --- DOM Element References ---
             // Cache references to frequently used DOM elements for performance
@@ -425,28 +250,20 @@
             const playPauseBtn = document.getElementById('playPauseBtn');
             const stepBtn = document.getElementById('stepBtn');
             const resetBtn = document.getElementById('resetBtn');
-            const undoBtn = document.getElementById('undoBtn');
-            const redoBtn = document.getElementById('redoBtn');
             const speedSlider = document.getElementById('speedSlider');
             const speedValueSpan = document.getElementById('speedValue');
-            const gridWidthInput = document.getElementById('gridWidthInput');
-            const gridHeightInput = document.getElementById('gridHeightInput');
-            const applyGridSizeBtn = document.getElementById('applyGridSizeBtn');
             const brushSizeSlider = document.getElementById('brushSizeSlider');
             const brushSizeValueSpan = document.getElementById('brushSizeValue');
             const fillGridBtn = document.getElementById('fillGridBtn');
             const clearGridBtn = document.getElementById('clearGridBtn');
-            const randomizeGridBtn = document.getElementById('randomizeGridBtn');
             const presetSelect = document.getElementById('presetSelect');
             const savePatternBtn = document.getElementById('savePatternBtn');
             const loadPatternBtn = document.getElementById('loadPatternBtn');
             const ruleInput = document.getElementById('ruleInput');
             const neighborhoodTypeRadios = document.querySelectorAll('input[name="neighborhoodType"]');
-            const boundaryTypeRadios = document.querySelectorAll('input[name="boundaryType"]');
             const birthConditionsDiv = document.getElementById('birthConditions');
             const survivalConditionsDiv = document.getElementById('survivalConditions');
             const aliveColorPicker = document.getElementById('aliveColorPicker');
-            const dyingColorPicker = document.getElementById('dyingColorPicker'); // New
             const deadColorPicker = document.getElementById('deadColorPicker');
             const gridLinesToggle = document.getElementById('gridLinesToggle');
             const zoomSlider = document.getElementById('zoomSlider');
@@ -457,113 +274,89 @@
             const loadPatternModal = document.getElementById('loadPatternModal');
             const modalSavedPatternsList = document.getElementById('modalSavedPatternsList');
             const closeModalBtn = document.getElementById('closeModalBtn');
-            const savePatternModal = document.getElementById('savePatternModal'); // New
-            const savePatternNameInput = document.getElementById('savePatternNameInput'); // New
-            const cancelSavePatternBtn = document.getElementById('cancelSavePatternBtn'); // New
-            const confirmSavePatternBtn = document.getElementById('confirmSavePatternBtn'); // New
             const shareLinkBtn = document.getElementById('shareLinkBtn');
-            const toastContainer = document.getElementById('toastContainer');
-
-            // Responsive Panel Elements
-            const controlPanel = document.getElementById('control-panel');
-            const ruleEditorPanel = document.getElementById('rule-editor-panel');
-            const controlPanelToggleBtn = controlPanel.querySelector('.panel-toggle-btn');
-            const ruleEditorPanelToggleBtn = ruleEditorPanel.querySelector('.panel-toggle-btn');
-            const controlPanelContent = controlPanel.querySelector('.panel-content');
-            const ruleEditorPanelContent = ruleEditorPanel.querySelector('.panel-content');
 
             // --- Application State ---
+            // Centralized state object to manage all dynamic data of the application.
+            // Using a plain object with a `setState` helper for simplicity in a single-file app,
+            // mimicking a lightweight state management pattern.
             let state = {
-                gridWidth: 100, // Default initial width
-                gridHeight: 100, // Default initial height
-                currentGrid: new Uint8Array(100 * 100), // Initialized with default size, values 0, 1, or 2
+                gridWidth: GRID_WIDTH,
+                gridHeight: GRID_HEIGHT,
+                currentGrid: new Uint8Array(GRID_WIDTH * GRID_HEIGHT), // Stores cell states (0 or 1)
+                nextGrid: new Uint8Array(GRID_WIDTH * GRID_HEIGHT), // Buffer for next generation computation
                 simulationRunning: false,
-                animationFrameId: null,
+                animationFrameId: null, // ID returned by requestAnimationFrame
                 generation: 0,
                 liveCells: 0,
-                simulationSpeed: 10,
-                framesToSkip: 0,
-                frameCounter: 0,
-                lastFrameTime: 0,
+                simulationSpeed: 10, // Target generations per second
+                framesToSkip: 0, // Number of animation frames to skip before computing next generation
+                frameCounter: 0, // Counter for skipped frames
+                lastFrameTime: 0, // Timestamp of the last frame for FPS calculation
                 fps: 0,
-                brushSize: 1,
-                isDrawing: false,
-                drawMode: 1, // 0 for dead, 1 for alive
+                brushSize: 1, // Size of the drawing brush (1x1, 3x3, etc.)
+                isDrawing: false, // Flag for canvas drawing interaction
+                drawMode: 1, // 1 for drawing alive cells, 0 for erasing (drawing dead cells)
                 rules: {
-                    birth: new Set([3]),
-                    survival: new Set([2, 3]),
-                    neighborhood: 'moore',
-                    boundary: 'toroidal'
+                    birth: new Set([3]), // Set of neighbor counts for a dead cell to become alive
+                    survival: new Set([2, 3]), // Set of neighbor counts for an alive cell to remain alive
+                    neighborhood: 'moore' // 'moore' (8 neighbors) or 'vonNeumann' (4 neighbors)
                 },
                 cellColors: {
-                    alive: '#00FF00',
-                    dead: '#000000',
-                    dying: '#FF8C00' // New: Dying cell color
+                    alive: '#00FF00', // Default color for alive cells (green)
+                    dead: '#000000' // Default color for dead cells (black)
                 },
-                gridLinesVisible: true,
-                zoomLevel: 1.0,
-                panOffsetX: 0, // New: for canvas panning
-                panOffsetY: 0, // New: for canvas panning
-                isPanning: false, // New: for canvas panning
-                lastPanX: 0, // New: for canvas panning
-                lastPanY: 0, // New: for canvas panning
-                savedPatterns: {},
-                history: [],
-                historyIndex: -1,
-                lastFpsUpdateTime: 0,
-                fpsFrameCount: 0
+                gridLinesVisible: true, // Toggle visibility of grid lines
+                zoomLevel: 1.0, // Current zoom level for the canvas
+                savedPatterns: {} // Object to store user-saved patterns from local storage
             };
 
             // --- Web Worker Setup ---
+            // The core simulation logic runs in a Web Worker to prevent UI freezing.
             let worker;
             const setupWorker = () => {
+                // Inline worker code as a string to embed directly in the HTML file.
                 const workerCode = `
                     let gridWidth, gridHeight;
                     let currentGrid;
                     let birthRules, survivalRules;
                     let neighborhoodType;
-                    let boundaryType;
 
+                    // Helper function to convert 2D coordinates to a 1D array index
                     function getIndex(x, y) {
                         return y * gridWidth + x;
                     }
 
+                    // Counts the number of live neighbors for a given cell (x, y)
                     function getNeighborCount(x, y) {
                         let count = 0;
                         const neighbors = [];
 
                         if (neighborhoodType === 'moore') {
+                            // Moore neighborhood: includes all 8 surrounding cells
                             neighbors.push(
                                 [x - 1, y - 1], [x, y - 1], [x + 1, y - 1],
                                 [x - 1, y],                 [x + 1, y],
                                 [x - 1, y + 1], [x, y + 1], [x + 1, y + 1]
                             );
-                        } else { // vonNeumann
+                        } else {
+                            // Von Neumann neighborhood: includes only 4 immediately adjacent cells (cross shape)
                             neighbors.push(
-                                [x, y - 1],
-                                [x - 1, y],
-                                [x + 1, y],
-                                [x, y + 1]
+                                [x, y - 1], // Top
+                                [x - 1, y], // Left
+                                [x + 1, y], // Right
+                                [x, y + 1]  // Bottom
                             );
                         }
 
                         for (const [nx, ny] of neighbors) {
-                            let finalX = nx;
-                            let finalY = ny;
+                            // Implement toroidal (wrap-around) boundaries
+                            const wrappedX = (nx + gridWidth) % gridWidth;
+                            const wrappedY = (ny + gridHeight) % gridHeight;
+                            // Correct for negative modulo results in some JS implementations
+                            const finalX = wrappedX < 0 ? wrappedX + gridWidth : wrappedX;
+                            const finalY = wrappedY < 0 ? wrappedY + gridHeight : wrappedY;
 
-                            if (boundaryType === 'toroidal') { // Apply wrapping
-                                finalX = (nx + gridWidth) % gridWidth;
-                                finalY = (ny + gridHeight) % gridHeight;
-                                // Ensure positive modulo for negative numbers (JS % can return negative)
-                                finalX = finalX < 0 ? finalX + gridWidth : finalX;
-                                finalY = finalY < 0 ? finalY + gridHeight : finalY;
-                            } else { // Finite boundary: check if within bounds
-                                if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) {
-                                    continue; // Skip out-of-bounds neighbors
-                                }
-                            }
-
-                            // Only count 'alive' cells (state 1) as neighbors
                             if (currentGrid[getIndex(finalX, finalY)] === 1) {
                                 count++;
                             }
@@ -571,9 +364,10 @@
                         return count;
                     }
 
+                    // Computes the next state of the grid based on the current state and rules
                     function computeNextGeneration() {
-                        const newGrid = new Uint8Array(gridWidth * gridHeight);
-                        let liveCellsCount = 0;
+                        const newGrid = new Uint8Array(gridWidth * gridHeight); // Create a new buffer for the next state
+                        let liveCellsCount = 0; // Track live cells for status update
 
                         for (let y = 0; y < gridHeight; y++) {
                             for (let x = 0; x < gridWidth; x++) {
@@ -581,59 +375,67 @@
                                 const currentState = currentGrid[index];
                                 const liveNeighbors = getNeighborCount(x, y);
 
-                                if (currentState === 0) { // Dead cell
-                                    if (birthRules.has(liveNeighbors)) {
-                                        newGrid[index] = 1; // Becomes Alive
-                                        liveCellsCount++;
-                                    } else {
-                                        newGrid[index] = 0; // Remains Dead
-                                    }
-                                } else if (currentState === 1) { // Alive cell
+                                if (currentState === 1) { // If the cell is currently alive
                                     if (survivalRules.has(liveNeighbors)) {
-                                        newGrid[index] = 1; // Remains Alive
+                                        newGrid[index] = 1; // It survives
                                         liveCellsCount++;
                                     } else {
-                                        newGrid[index] = 2; // Becomes Dying
+                                        newGrid[index] = 0; // It dies
                                     }
-                                } else if (currentState === 2) { // Dying cell
-                                    newGrid[index] = 0; // Becomes Dead
+                                } else { // If the cell is currently dead
+                                    if (birthRules.has(liveNeighbors)) {
+                                        newGrid[index] = 1; // It is born
+                                        liveCellsCount++;
+                                    } else {
+                                        newGrid[index] = 0; // It remains dead
+                                    }
                                 }
                             }
                         }
                         return { newGrid, liveCellsCount };
                     }
 
+                    // Message handler for the Web Worker
                     self.onmessage = function(event) {
                         const { type, payload } = event.data;
 
                         if (type === 'init') {
+                            // Initialize worker with grid dimensions
                             gridWidth = payload.gridWidth;
                             gridHeight = payload.gridHeight;
                         } else if (type === 'compute') {
+                            // Receive current grid and rules from the main thread
                             currentGrid = payload.currentGrid;
-                            birthRules = new Set(payload.birthRules);
+                            birthRules = new Set(payload.birthRules); // Convert array back to Set
                             survivalRules = new Set(payload.survivalRules);
                             neighborhoodType = payload.neighborhoodType;
-                            boundaryType = payload.boundaryType;
+
+                            // Compute the next generation
                             const { newGrid, liveCellsCount } = computeNextGeneration();
+                            // Send the new grid and live cell count back to the main thread.
+                            // Use transferable objects ([newGrid.buffer]) for performance to avoid copying large data.
                             self.postMessage({ type: 'computed', newGrid, liveCellsCount }, [newGrid.buffer]);
                         }
                     };
                 `;
 
+                // Create a Blob from the worker code string
                 const blob = new Blob([workerCode], { type: 'application/javascript' });
+                // Create a URL for the Blob (this allows the browser to run the string as a script)
                 const blobURL = URL.createObjectURL(blob);
                 worker = new Worker(blobURL);
 
+                // Handle messages coming back from the Web Worker
                 worker.onmessage = function(event) {
                     if (event.data.type === 'computed') {
+                        // The newGrid buffer has been transferred, so we can directly use it
                         state.currentGrid = event.data.newGrid;
                         state.liveCells = event.data.liveCellsCount;
                         state.generation++;
-                        pushToHistory();
-                        updateStatusBar();
-                        drawGrid();
+                        updateStatusBar(); // Update UI metrics
+                        drawGrid(); // Render the newly computed grid
 
+                        // If simulation is still running, request the next animation frame
                         if (state.simulationRunning) {
                             state.animationFrameId = requestAnimationFrame(gameLoop);
                         }
@@ -645,143 +447,129 @@
             };
 
             // --- State Management Helper ---
+            // A simple `setState` function to update the application state and trigger UI updates.
             function setState(newState) {
+                // Merge the new state with the existing state
                 Object.assign(state, newState);
 
+                // Perform specific UI updates based on which state properties changed
                 if ('simulationRunning' in newState) {
                     playPauseBtn.textContent = state.simulationRunning ? 'Pause' : 'Play';
                     playPauseBtn.setAttribute('aria-label', state.simulationRunning ? 'Pause simulation' : 'Play simulation');
-                    stepBtn.disabled = state.simulationRunning;
                 }
                 if ('simulationSpeed' in newState) {
                     speedValueSpan.textContent = `${state.simulationSpeed}x`;
+                    // Calculate frames to skip for desired generations per second (assuming 60 FPS monitor)
                     state.framesToSkip = Math.max(0, Math.floor(60 / state.simulationSpeed) - 1);
-                }
-                if ('gridWidth' in newState) {
-                    gridWidthInput.value = state.gridWidth;
-                }
-                if ('gridHeight' in newState) {
-                    gridHeightInput.value = state.gridHeight;
                 }
                 if ('brushSize' in newState) {
                     brushSizeValueSpan.textContent = state.brushSize;
                 }
                 if ('zoomLevel' in newState) {
                     zoomValueSpan.textContent = `${state.zoomLevel.toFixed(1)}x`;
-                    drawGrid();
+                    drawGrid(); // Redraw immediately when zoom changes
                 }
-                if ('cellColors' in newState || 'gridLinesVisible' in newState || 'panOffsetX' in newState || 'panOffsetY' in newState) {
-                    drawGrid();
+                if ('cellColors' in newState || 'gridLinesVisible' in newState) {
+                    drawGrid(); // Redraw immediately if visual settings change
                 }
                 if ('rules' in newState) {
-                    updateRuleUIFromState();
+                    updateRuleUIFromState(); // Update rule input and checkboxes
                 }
                 if ('generation' in newState || 'liveCells' in newState || 'fps' in newState) {
-                    updateStatusBar();
-                }
-                if ('historyIndex' in newState || 'history' in newState) {
-                    undoBtn.disabled = state.historyIndex <= 0;
-                    redoBtn.disabled = state.historyIndex >= state.history.length - 1;
+                    updateStatusBar(); // Update status bar metrics
                 }
             }
 
             // --- Grid Operations ---
+            // Helper to get the 1D array index from 2D grid coordinates
             function getIndex(x, y) {
                 return y * state.gridWidth + x;
             }
 
+            // Initializes the grid, either empty or completely filled with alive cells
             function initializeGrid(fill = false) {
-                state.currentGrid = new Uint8Array(state.gridWidth * state.gridHeight); // Re-initialize with current dimensions
                 for (let i = 0; i < state.currentGrid.length; i++) {
-                    state.currentGrid[i] = fill ? 1 : 0; // Fill with 'alive' state (1)
+                    state.currentGrid[i] = fill ? 1 : 0;
                 }
-                state.liveCells = fill ? state.currentGrid.length : 0;
-                state.generation = 0;
-                // Reset pan offset when grid is re-initialized
-                setState({ panOffsetX: 0, panOffsetY: 0 });
-                pushToHistory();
+                state.liveCells = fill ? state.currentGrid.length : 0; // Update live cell count
+                state.generation = 0; // Reset generation count
                 updateStatusBar();
                 drawGrid();
             }
 
-            function randomizeGrid() {
-                pauseSimulation();
-                state.currentGrid = new Uint8Array(state.gridWidth * state.gridHeight);
-                for (let i = 0; i < state.currentGrid.length; i++) {
-                    state.currentGrid[i] = Math.random() > 0.5 ? 1 : 0; // 50% chance for alive (state 1)
-                }
-                state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
-                state.generation = 0;
-                setState({ panOffsetX: 0, panOffsetY: 0 }); // Reset pan on randomize
-                pushToHistory();
-                updateStatusBar();
-                drawGrid();
-            }
-
+            // Sets the state of a single cell at given grid coordinates
             function setCell(x, y, value) {
+                // Ensure coordinates are within grid boundaries
                 if (x >= 0 && x < state.gridWidth && y >= 0 && y < state.gridHeight) {
                     const index = getIndex(x, y);
+                    // Only update if the state actually changes
                     if (state.currentGrid[index] !== value) {
                         state.currentGrid[index] = value;
+                        // Live cell count is updated after drawing stops (mouseup) or after a simulation step
                     }
                 }
             }
 
-            function drawBrush(gridX, gridY, value) { // Now takes grid coordinates directly
-                const brushRadius = Math.floor((state.brushSize - 1) / 2);
+            // Draws cells on the canvas using the current brush size and draw mode
+            function drawBrush(canvasX, canvasY, value) {
+                // Convert canvas pixel coordinates to grid coordinates, accounting for current zoom
+                const gridX = Math.floor(canvasX / (BASE_CELL_SIZE_PX * state.zoomLevel));
+                const gridY = Math.floor(canvasY / (BASE_CELL_SIZE_PX * state.zoomLevel));
+                const brushRadius = Math.floor((state.brushSize - 1) / 2); // Calculate brush radius from size
 
+                // Iterate over the brush area and set cell states
                 for (let y = gridY - brushRadius; y <= gridY + brushRadius; y++) {
                     for (let x = gridX - brushRadius; x <= gridX + brushRadius; x++) {
                         setCell(x, y, value);
                     }
                 }
-                drawGrid();
+                drawGrid(); // Redraw the canvas immediately after each brush stroke
             }
 
             // --- Canvas Rendering ---
+            // Sets the internal resolution of the canvas element
             function setupCanvasDimensions() {
                 canvas.width = state.gridWidth * BASE_CELL_SIZE_PX;
                 canvas.height = state.gridHeight * BASE_CELL_SIZE_PX;
+                // The CSS `max-width: 100%; max-height: 100%;` will handle scaling the canvas element
+                // to fit its parent container, while `ctx.scale` handles the internal zoom.
             }
 
+            // Draws the entire grid onto the canvas
             function drawGrid() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the entire canvas
 
-                ctx.save();
-                ctx.scale(state.zoomLevel, state.zoomLevel);
-                ctx.translate(state.panOffsetX, state.panOffsetY); // Apply pan offset
+                ctx.save(); // Save the current state of the canvas context (before scaling)
+                ctx.scale(state.zoomLevel, state.zoomLevel); // Apply the current zoom transformation
 
                 const aliveColor = state.cellColors.alive;
                 const deadColor = state.cellColors.dead;
-                const dyingColor = state.cellColors.dying; // New: Dying color
-                const baseCellSize = BASE_CELL_SIZE_PX;
+                const baseCellSize = BASE_CELL_SIZE_PX; // Use base size for drawing operations after scale
 
+                // Iterate through the grid and draw each cell
                 for (let y = 0; y < state.gridHeight; y++) {
                     for (let x = 0; x < state.gridWidth; x++) {
                         const index = getIndex(x, y);
                         const cellState = state.currentGrid[index];
 
-                        if (cellState === 1) { // Alive
-                            ctx.fillStyle = aliveColor;
-                        } else if (cellState === 2) { // Dying
-                            ctx.fillStyle = dyingColor;
-                        } else { // Dead (0)
-                            ctx.fillStyle = deadColor;
-                        }
+                        ctx.fillStyle = cellState === 1 ? aliveColor : deadColor;
                         ctx.fillRect(x * baseCellSize, y * baseCellSize, baseCellSize, baseCellSize);
                     }
                 }
 
+                // Draw grid lines if enabled and cells are large enough to make them visible
                 if (state.gridLinesVisible && (baseCellSize * state.zoomLevel) > 5) {
-                    ctx.strokeStyle = 'rgba(100, 100, 100, 0.5)';
-                    ctx.lineWidth = 0.5 / state.zoomLevel;
+                    ctx.strokeStyle = 'rgba(100, 100, 100, 0.5)'; // Semi-transparent gray lines
+                    ctx.lineWidth = 0.5 / state.zoomLevel; // Adjust line width to appear consistent regardless of zoom
 
+                    // Draw vertical lines
                     for (let x = 0; x <= state.gridWidth; x++) {
                         ctx.beginPath();
                         ctx.moveTo(x * baseCellSize, 0);
                         ctx.lineTo(x * baseCellSize, state.gridHeight * baseCellSize);
                         ctx.stroke();
                     }
+                    // Draw horizontal lines
                     for (let y = 0; y <= state.gridHeight; y++) {
                         ctx.beginPath();
                         ctx.moveTo(0, y * baseCellSize);
@@ -790,40 +578,44 @@
                     }
                 }
 
-                ctx.restore();
+                ctx.restore(); // Restore the canvas context to its state before scaling
             }
 
             // --- Simulation Loop ---
+            // The main animation loop, controlled by requestAnimationFrame.
             function gameLoop(timestamp) {
                 if (!state.simulationRunning) {
-                    return;
+                    return; // Stop the loop if simulation is paused
                 }
 
-                if (state.lastFpsUpdateTime === 0) {
-                    state.lastFpsUpdateTime = timestamp;
+                // FPS calculation
+                if (state.lastFrameTime === 0) state.lastFrameTime = timestamp;
+                const deltaTime = timestamp - state.lastFrameTime;
+                state.lastFrameTime = timestamp;
+
+                state.frameCounter++;
+                // Update FPS display roughly every 100ms or every 60 frames
+                if (deltaTime > 100 || state.frameCounter % 60 === 0) {
+                    state.fps = Math.round(1000 / deltaTime);
+                    updateStatusBar();
                 }
 
-                state.fpsFrameCount++;
-                const now = performance.now();
-                if (now - state.lastFpsUpdateTime >= 1000) { // Update FPS every second
-                    state.fps = (state.fpsFrameCount * 1000) / (now - state.lastFpsUpdateTime);
-                    state.lastFpsUpdateTime = now;
-                    state.fpsFrameCount = 0;
-                }
-
+                // Skip frames to control simulation speed: compute next generation only after `framesToSkip` frames
                 if (state.frameCounter > state.framesToSkip) {
-                    state.frameCounter = 0;
+                    state.frameCounter = 0; // Reset frame counter
+                    // Request computation from the Web Worker, transferring the current grid buffer
                     worker.postMessage({
                         type: 'compute',
                         payload: {
                             currentGrid: state.currentGrid,
-                            birthRules: Array.from(state.rules.birth),
+                            birthRules: Array.from(state.rules.birth), // Convert Set to Array for transfer
                             survivalRules: Array.from(state.rules.survival),
-                            neighborhoodType: state.rules.neighborhood,
-                            boundaryType: state.rules.boundary
+                            neighborhoodType: state.rules.neighborhood
                         }
-                    }, [state.currentGrid.buffer]);
+                    }, [state.currentGrid.buffer]); // Transfer the buffer to worker for efficiency
+                    // The worker's `onmessage` handler will receive the computed grid and call `requestAnimationFrame` for the next step.
                 } else {
+                    // If not computing this frame, just request the next animation frame to keep the UI responsive
                     state.animationFrameId = requestAnimationFrame(gameLoop);
                 }
             }
@@ -832,7 +624,7 @@
             function startSimulation() {
                 if (!state.simulationRunning) {
                     setState({ simulationRunning: true });
-                    state.animationFrameId = requestAnimationFrame(gameLoop);
+                    state.animationFrameId = requestAnimationFrame(gameLoop); // Start the animation loop
                 }
             }
 
@@ -840,123 +632,58 @@
                 if (state.simulationRunning) {
                     setState({ simulationRunning: false });
                     if (state.animationFrameId) {
-                        cancelAnimationFrame(state.animationFrameId);
+                        cancelAnimationFrame(state.animationFrameId); // Stop the animation loop
                         state.animationFrameId = null;
                     }
                 }
             }
 
             function stepSimulation() {
-                if (!state.simulationRunning) {
+                if (!state.simulationRunning) { // Allow stepping only when simulation is paused
+                    // Directly request computation from the Web Worker for a single step
                     worker.postMessage({
                         type: 'compute',
                         payload: {
                             currentGrid: state.currentGrid,
                             birthRules: Array.from(state.rules.birth),
                             survivalRules: Array.from(state.rules.survival),
-                            neighborhoodType: state.rules.neighborhood,
-                            boundaryType: state.rules.boundary
+                            neighborhoodType: state.rules.neighborhood
                         }
                     }, [state.currentGrid.buffer]);
                 }
             }
 
             function resetSimulation() {
-                pauseSimulation();
-                initializeGrid(false); // This will call pushToHistory
-                setState({ generation: 0, liveCells: 0, fps: 0 });
-            }
-
-            function pushToHistory(gridToSave = state.currentGrid) {
-                if (state.historyIndex < state.history.length - 1) {
-                    state.history.splice(state.historyIndex + 1);
-                }
-
-                state.history.push(new Uint8Array(gridToSave));
-
-                if (state.history.length > MAX_HISTORY_SIZE) {
-                    state.history.shift();
-                }
-
-                state.historyIndex = state.history.length - 1;
-
-                setState({});
-            }
-
-            function undo() {
-                if (state.historyIndex > 0) {
-                    pauseSimulation();
-                    state.historyIndex--;
-                    state.currentGrid = new Uint8Array(state.history[state.historyIndex]);
-                    state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
-                    state.generation--;
-                    if (state.generation < 0) state.generation = 0;
-                    updateStatusBar();
-                    drawGrid();
-                    setState({});
-                } else {
-                    showToast('No more history to undo.', 'info');
-                }
-            }
-
-            function redo() {
-                if (state.historyIndex < state.history.length - 1) {
-                    pauseSimulation();
-                    state.historyIndex++;
-                    state.currentGrid = new Uint8Array(state.history[state.historyIndex]);
-                    state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
-                    state.generation++;
-                    updateStatusBar();
-                    drawGrid();
-                    setState({});
-                } else {
-                    showToast('No more history to redo.', 'info');
-                }
-            }
-
-            function applyGridSize() {
-                const newWidth = parseInt(gridWidthInput.value);
-                const newHeight = parseInt(gridHeightInput.value);
-
-                if (isNaN(newWidth) || isNaN(newHeight) || newWidth < 10 || newHeight < 5 || newWidth > 500 || newHeight > 500) {
-                    showToast("Please enter valid grid dimensions (min 10, max 500).", 'error');
-                    return;
-                }
-
-                if (newWidth === state.gridWidth && newHeight === state.gridHeight) {
-                    showToast("Grid size is already " + newWidth + "x" + newHeight + ".", 'info');
-                    return;
-                }
-
-                pauseSimulation();
-                setState({ gridWidth: newWidth, gridHeight: newHeight });
-                setupCanvasDimensions();
-                initializeGrid(false);
-                worker.postMessage({ type: 'init', payload: { gridWidth: state.gridWidth, gridHeight: state.gridHeight } });
-                drawGrid();
-                showToast('Grid size applied!', 'success');
+                pauseSimulation(); // Pause if running
+                initializeGrid(false); // Clear the grid
+                setState({ generation: 0, liveCells: 0, fps: 0 }); // Reset metrics
             }
 
             // --- Rule Engine ---
+            // Parses a rule string (e.g., "B3/S23") into birth and survival rule sets.
             function parseRuleString(ruleString) {
                 const match = ruleString.match(/B(\d*)\/S(\d*)/i);
-                if (!match) return null;
+                if (!match) return null; // Return null if the string format is invalid
 
                 const birthStr = match[1];
                 const survivalStr = match[2];
 
+                // Convert digit strings to sets of numbers, filtering for valid neighbor counts (0-8)
                 const birth = new Set(birthStr.split('').map(Number).filter(n => n >= 0 && n <= 8));
                 const survival = new Set(survivalStr.split('').map(Number).filter(n => n >= 0 && n <= 8));
 
                 return { birth, survival };
             }
 
+            // Generates a rule string (e.g., "B3/S23") from birth and survival rule sets.
             function generateRuleString(birthSet, survivalSet) {
+                // Sort numbers for consistent output
                 const sortedBirth = Array.from(birthSet).sort((a, b) => a - b).join('');
                 const sortedSurvival = Array.from(survivalSet).sort((a, b) => a - b).join('');
                 return `B${sortedBirth}/S${sortedSurvival}`;
             }
 
+            // Updates the UI elements (text input, radio buttons, checkboxes) to reflect current rule state.
             function updateRuleUIFromState() {
                 ruleInput.value = generateRuleString(state.rules.birth, state.rules.survival);
 
@@ -964,10 +691,7 @@
                     radio.checked = radio.value === state.rules.neighborhood;
                 });
 
-                boundaryTypeRadios.forEach(radio => {
-                    radio.checked = radio.value === state.rules.boundary;
-                });
-
+                // Update visual rule builder checkboxes
                 for (let i = 0; i <= 8; i++) {
                     const birthCheckbox = document.getElementById(`birth-${i}`);
                     if (birthCheckbox) birthCheckbox.checked = state.rules.birth.has(i);
@@ -977,30 +701,34 @@
                 }
             }
 
+            // Dynamically creates checkboxes for the visual rule builder (0-8 neighbors).
             function createRuleCheckboxes(container, type) {
                 for (let i = 0; i <= 8; i++) {
                     const label = document.createElement('label');
-                    label.className = 'rule-checkbox-item';
+                    label.className = 'checkbox-label'; // Apply Tailwind classes
                     label.innerHTML = `
-                        <input type="checkbox" id="${type}-${i}" value="${i}" aria-label="${type} condition for ${i} neighbors">
-                        <span>${i}</span>
+                        <input type="checkbox" id="${type}-${i}" value="${i}" class="form-checkbox" aria-label="${type} condition for ${i} neighbors">
+                        <span class="ml-2">${i}</span>
                     `;
+                    // Add event listener to update state when checkbox changes
                     label.querySelector('input').addEventListener('change', (e) => {
                         const num = Number(e.target.value);
-                        const newRules = { ...state.rules };
-                        newRules[type] = new Set(state.rules[type]);
+                        const newRules = { ...state.rules }; // Create a shallow copy of rules object
+                        // Ensure the birth/survival sets are also new Set instances to trigger React-like updates if used
+                        newRules[type] = new Set(state.rules[type]); // Create a new Set from the old one
                         if (e.target.checked) {
                             newRules[type].add(num);
                         } else {
                             newRules[type].delete(num);
                         }
-                        setState({ rules: newRules });
+                        setState({ rules: newRules }); // Update the application state
                     });
                     container.appendChild(label);
                 }
             }
 
             // --- Pattern Presets ---
+            // Predefined common cellular automata patterns.
             const presets = {
                 glider: [
                     [1, 0, 0],
@@ -1014,6 +742,7 @@
                     [0, 0, 1, 1, 0]
                 ],
                 gosperGliderGun: [
+                    // Represented as a sparse array of [x,y] coordinates for easier definition
                     [0,4],[1,4],[0,5],[1,5],
                     [10,4],[11,4],[10,5],[11,5],[10,6],[12,3],[12,7],[13,2],[13,8],[14,2],[14,8],[15,5],[16,3],[16,7],[17,4],[17,5],[17,6],
                     [20,2],[21,2],[20,3],[21,3],[20,4],[22,1],[22,5],[24,0],[24,1],[24,5],[24,6],
@@ -1037,96 +766,104 @@
                 ]
             };
 
+            // Loads a selected preset pattern onto the grid.
             function loadPreset(presetName) {
                 const pattern = presets[presetName];
                 if (!pattern) return;
 
-                pauseSimulation();
-                initializeGrid(false);
+                pauseSimulation(); // Pause simulation before loading new pattern
+                initializeGrid(false); // Clear the current grid
 
-                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                let patternCells = [];
+                let offsetX = 0;
+                let offsetY = 0;
 
-                if (Array.isArray(pattern[0])) { // 2D array representation
+                // Determine pattern type: 2D array (e.g., Glider) or array of [x,y] coordinates (e.g., Gosper Glider Gun)
+                if (Array.isArray(pattern[0])) { // It's a 2D array representation
+                    let maxX = 0, maxY = pattern.length;
+                    pattern.forEach(row => {
+                        if (row.length > maxX) maxX = row.length;
+                    });
+
+                    // Calculate offset to center the pattern on the grid
+                    offsetX = Math.floor((state.gridWidth - maxX) / 2);
+                    offsetY = Math.floor((state.gridHeight - maxY) / 2);
+
                     pattern.forEach((row, y) => {
                         row.forEach((cell, x) => {
                             if (cell === 1) {
-                                patternCells.push([x, y]);
-                                if (x < minX) minX = x;
-                                if (y < minY) minY = y;
-                                if (x > maxX) maxX = x;
-                                if (y > maxY) maxY = y;
+                                setCell(offsetX + x, offsetY + y, 1);
                             }
                         });
                     });
-                } else { // Array of [x,y] coordinates
-                    patternCells = pattern;
+                } else { // It's an array of [x,y] coordinates
+                    // Find min/max coordinates to calculate pattern dimensions and center it
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                     pattern.forEach(([x, y]) => {
                         if (x < minX) minX = x;
                         if (y < minY) minY = y;
                         if (x > maxX) maxX = x;
                         if (y > maxY) maxY = y;
                     });
+
+                    const patternWidth = maxX - minX + 1;
+                    const patternHeight = maxY - minY + 1;
+
+                    offsetX = Math.floor((state.gridWidth - patternWidth) / 2) - minX;
+                    offsetY = Math.floor((state.gridHeight - patternHeight) / 2) - minY;
+
+                    pattern.forEach(([x, y]) => {
+                        setCell(offsetX + x, offsetY + y, 1);
+                    });
                 }
-
-                if (patternCells.length === 0) return;
-
-                const patternWidth = maxX - minX + 1;
-                const patternHeight = maxY - minY + 1;
-
-                // Calculate offset to center the pattern on the current grid dimensions
-                const offsetX = Math.floor((state.gridWidth - patternWidth) / 2) - minX;
-                const offsetY = Math.floor((state.gridHeight - patternHeight) / 2) - minY;
-
-                patternCells.forEach(([x, y]) => {
-                    setCell(offsetX + x, offsetY + y, 1); // Set to 'alive' state (1)
-                });
-
+                // Update live cell count and redraw after placing the pattern
                 state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
-                state.generation = 0;
-                pushToHistory();
                 updateStatusBar();
                 drawGrid();
-                showToast(`Preset "${presetName}" loaded!`, 'success');
             }
 
             // --- Persistence (Local Storage & URL Hash) ---
-            function saveCurrentPattern(patternName) {
+            // Saves the current grid pattern and rules to local storage.
+            function saveCurrentPattern() {
+                const patternName = prompt("Enter a name for your pattern:");
+                if (!patternName) return; // User cancelled
+
+                // Check if a pattern with this name already exists
+                if (state.savedPatterns[patternName]) {
+                    if (!confirm(`A pattern named "${patternName}" already exists. Overwrite?`)) {
+                        return; // User chose not to overwrite
+                    }
+                }
+
                 const patternData = {
-                    grid: Array.from(state.currentGrid),
+                    grid: Array.from(state.currentGrid), // Convert Uint8Array to regular Array for JSON serialization
                     rules: {
-                        birth: Array.from(state.rules.birth),
-                        survival: Array.from(state.rules.survival),
-                        neighborhood: state.rules.neighborhood,
-                        boundary: state.rules.boundary
-                    },
-                    cellColors: { // Save all 3 colors
-                        alive: state.cellColors.alive,
-                        dead: state.cellColors.dead,
-                        dying: state.cellColors.dying
-                    },
-                    gridWidth: state.gridWidth,
-                    gridHeight: state.gridHeight
+                        birth: Array.from(state.rules.birth), // Convert Set to Array
+                        survival: Array.from(state.rules.survival), // Convert Set to Array
+                        neighborhood: state.rules.neighborhood
+                    }
                 };
 
                 state.savedPatterns[patternName] = patternData;
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.savedPatterns));
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.savedPatterns)); // Save to local storage
+                alert(`Pattern "${patternName}" saved!`);
+                loadSavedPatternsToModal(); // Refresh the list in the modal
             }
 
+            // Loads saved patterns from local storage and displays them in a modal.
             function loadSavedPatterns() {
                 const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
                 if (saved) {
                     state.savedPatterns = JSON.parse(saved);
                 } else {
-                    state.savedPatterns = {};
+                    state.savedPatterns = {}; // Initialize empty if no saved patterns found
                 }
-                loadSavedPatternsToModal();
-                loadPatternModal.classList.remove('hidden');
-                setTimeout(() => loadPatternModal.classList.add('show'), 10);
+                loadSavedPatternsToModal(); // Populate the modal with saved patterns
+                loadPatternModal.classList.remove('hidden'); // Show the modal
             }
 
+            // Populates the modal with buttons to load or delete saved patterns.
             function loadSavedPatternsToModal() {
-                modalSavedPatternsList.innerHTML = '';
+                modalSavedPatternsList.innerHTML = ''; // Clear existing list
                 const patternNames = Object.keys(state.savedPatterns);
 
                 if (patternNames.length === 0) {
@@ -1137,10 +874,8 @@
                 patternNames.forEach(name => {
                     const div = document.createElement('div');
                     div.className = 'flex justify-between items-center py-1 border-b border-gray-600 last:border-b-0';
-                    const patternInfo = state.savedPatterns[name];
-                    const dimensions = patternInfo.gridWidth && patternInfo.gridHeight ? ` (${patternInfo.gridWidth}x${patternInfo.gridHeight})` : '';
                     div.innerHTML = `
-                        <span class="text-gray-200">${name}${dimensions}</span>
+                        <span class="text-gray-200">${name}</span>
                         <div>
                             <button class="btn-secondary text-xs px-2 py-1 mr-2 load-btn" data-pattern-name="${name}" aria-label="Load pattern ${name}">Load</button>
                             <button class="btn-secondary text-xs px-2 py-1 delete-btn" data-pattern-name="${name}" aria-label="Delete pattern ${name}">Delete</button>
@@ -1149,90 +884,64 @@
                     modalSavedPatternsList.appendChild(div);
                 });
 
+                // Add event listeners for load buttons
                 modalSavedPatternsList.querySelectorAll('.load-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
                         const name = e.target.dataset.patternName;
                         const patternData = state.savedPatterns[name];
                         if (patternData) {
                             pauseSimulation();
-                            // If pattern has saved dimensions, apply them first
-                            if (patternData.gridWidth && patternData.gridHeight) {
-                                const newWidth = Math.max(10, Math.min(500, parseInt(patternData.gridWidth)));
-                                const newHeight = Math.max(10, Math.min(500, parseInt(patternData.gridHeight)));
-                                if (!isNaN(newWidth) && !isNaN(newHeight)) {
-                                    setState({ gridWidth: newWidth, gridHeight: newHeight });
-                                    setupCanvasDimensions();
-                                    worker.postMessage({ type: 'init', payload: { gridWidth: state.gridWidth, gridHeight: state.gridHeight } });
-                                }
-                            }
-
-                            let newCurrentGrid = new Uint8Array(state.gridWidth * state.gridHeight);
+                            // Create a new Uint8Array from loaded grid data.
+                            // Handle potential size mismatches by creating a new grid of current dimensions
+                            // and copying what fits.
                             const loadedGrid = new Uint8Array(patternData.grid);
-                            const sourceWidth = patternData.gridWidth || state.gridWidth;
-                            const sourceHeight = patternData.gridHeight || state.gridHeight;
-
-                            for (let y = 0; y < Math.min(sourceHeight, state.gridHeight); y++) {
-                                for (let x = 0; x < Math.min(sourceWidth, state.gridWidth); x++) {
-                                    const loadedIndex = y * sourceWidth + x;
-                                    const currentIndex = y * state.gridWidth + x;
-                                    if (loadedIndex < loadedGrid.length && currentIndex < newCurrentGrid.length) {
-                                        newCurrentGrid[currentIndex] = loadedGrid[loadedIndex];
-                                    }
-                                }
-                            }
+                            let newCurrentGrid = new Uint8Array(state.gridWidth * state.gridHeight);
+                            const copyLength = Math.min(loadedGrid.length, newCurrentGrid.length);
+                            newCurrentGrid.set(loadedGrid.slice(0, copyLength));
 
                             setState({
                                 currentGrid: newCurrentGrid,
                                 rules: {
                                     birth: new Set(patternData.rules.birth),
                                     survival: new Set(patternData.rules.survival),
-                                    neighborhood: patternData.rules.neighborhood,
-                                    boundary: patternData.rules.boundary || 'toroidal'
-                                },
-                                cellColors: { // Load all 3 colors
-                                    alive: patternData.cellColors.alive,
-                                    dead: patternData.cellColors.dead,
-                                    dying: patternData.cellColors.dying || '#FF8C00' // Default if not present
+                                    neighborhood: patternData.rules.neighborhood
                                 }
                             });
                             state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
                             state.generation = 0;
-                            pushToHistory();
                             updateStatusBar();
                             drawGrid();
-                            loadPatternModal.classList.remove('show');
-                            loadPatternModal.addEventListener('transitionend', function handler() {
-                                loadPatternModal.classList.add('hidden');
-                                loadPatternModal.removeEventListener('transitionend', handler);
-                            }, { once: true });
-                            showToast(`Pattern "${name}" loaded!`, 'success');
+                            loadPatternModal.classList.add('hidden'); // Hide modal after loading
+                            alert(`Pattern "${name}" loaded!`);
                         }
                     });
                 });
 
+                // Add event listeners for delete buttons
                 modalSavedPatternsList.querySelectorAll('.delete-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
                         const name = e.target.dataset.patternName;
                         if (confirm(`Are you sure you want to delete "${name}"?`)) {
-                            delete state.savedPatterns[name];
-                            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.savedPatterns));
-                            loadSavedPatternsToModal();
-                            showToast(`Pattern "${name}" deleted!`, 'info');
+                            delete state.savedPatterns[name]; // Remove from object
+                            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.savedPatterns)); // Update local storage
+                            loadSavedPatternsToModal(); // Refresh the list
                         }
                     });
                 });
             }
 
+            // Encodes the current application state into the URL hash for sharing.
             function encodeStateToUrl() {
+                // Use a simple Run-Length Encoding (RLE) to compress grid data for shorter URLs.
                 let rleGrid = '';
                 let count = 0;
-                let lastState = -1; // Use -1 to ensure first cell starts a new run
+                let lastState = -1; // -1 for initial state, 0 for dead, 1 for alive
 
                 for (let i = 0; i < state.currentGrid.length; i++) {
                     const currentState = state.currentGrid[i];
                     if (currentState !== lastState) {
                         if (count > 0) {
-                            rleGrid += `${count}${lastState}`;
+                            rleGrid += `${count}${lastState}`; // Append count and state
                         }
                         lastState = currentState;
                         count = 1;
@@ -1241,106 +950,73 @@
                     }
                 }
                 if (count > 0) {
-                    rleGrid += `${count}${lastState}`;
+                    rleGrid += `${count}${lastState}`; // Append final segment
                 }
-                const encodedGrid = btoa(rleGrid);
+                const encodedGrid = btoa(rleGrid); // Base64 encode the RLE string
 
                 const ruleStr = generateRuleString(state.rules.birth, state.rules.survival);
                 const neighborhood = state.rules.neighborhood;
-                const boundary = state.rules.boundary;
-                const aliveColor = state.cellColors.alive.replace('#', '');
+                const aliveColor = state.cellColors.alive.replace('#', ''); // Remove '#' for simpler URL
                 const deadColor = state.cellColors.dead.replace('#', '');
-                const dyingColor = state.cellColors.dying.replace('#', ''); // New: Dying color
                 const gridLines = state.gridLinesVisible ? 1 : 0;
                 const zoom = state.zoomLevel.toFixed(1);
-                const gridWidth = state.gridWidth;
-                const gridHeight = state.gridHeight;
-                const panX = Math.round(state.panOffsetX); // Round to avoid long decimals
-                const panY = Math.round(state.panOffsetY); // Round to avoid long decimals
 
-
+                // Use URLSearchParams to build the query string for the hash
                 const params = new URLSearchParams();
                 params.append('g', encodedGrid);
                 params.append('r', ruleStr);
                 params.append('n', neighborhood);
-                params.append('b', boundary);
                 params.append('ac', aliveColor);
                 params.append('dc', deadColor);
-                params.append('dyc', dyingColor); // New: Append dying color
                 params.append('gl', gridLines);
                 params.append('z', zoom);
-                params.append('gw', gridWidth);
-                params.append('gh', gridHeight);
-                params.append('px', panX); // New: Append pan X
-                params.append('py', panY); // New: Append pan Y
 
+                // Construct the full URL with the hash
                 const url = window.location.origin + window.location.pathname + '#' + params.toString();
+                // Copy the URL to the clipboard
                 navigator.clipboard.writeText(url).then(() => {
-                    showToast('Share link copied!', 'success');
+                    alert('Current state URL copied to clipboard! You can share this link.');
                 }).catch(err => {
                     console.error('Failed to copy URL:', err);
-                    showToast('Failed to copy URL to clipboard. Please copy from address bar manually.', 'error');
+                    alert('Failed to copy URL to clipboard. Please copy from address bar manually: ' + url);
                 });
             }
 
+            // Decodes application state from the URL hash and applies it.
             function decodeStateFromUrl() {
-                const hash = window.location.hash.substring(1);
-                if (!hash) return false;
+                const hash = window.location.hash.substring(1); // Get hash without leading '#'
+                if (!hash) return false; // No hash found
 
                 try {
                     const params = new URLSearchParams(hash);
                     const encodedGrid = params.get('g');
                     const ruleStr = params.get('r');
                     const neighborhood = params.get('n');
-                    const boundary = params.get('b');
                     const aliveColor = params.get('ac');
                     const deadColor = params.get('dc');
-                    const dyingColor = params.get('dyc'); // New: Get dying color
                     const gridLines = params.get('gl');
                     const zoom = params.get('z');
-                    const loadedGridWidth = params.get('gw');
-                    const loadedGridHeight = params.get('gh');
-                    const panX = params.get('px'); // New: Get pan X
-                    const panY = params.get('py'); // New: Get pan Y
-
-                    // Apply grid dimensions first if they exist in the URL
-                    let tempGridWidth = state.gridWidth;
-                    let tempGridHeight = state.gridHeight;
-
-                    if (loadedGridWidth && loadedGridHeight) {
-                        const parsedWidth = parseInt(loadedGridWidth);
-                        const parsedHeight = parseInt(loadedGridHeight);
-                        if (!isNaN(parsedWidth) && !isNaN(parsedHeight) && parsedWidth >=10 && parsedHeight >=10 && parsedWidth <= 500 && parsedHeight <= 500) {
-                            tempGridWidth = parsedWidth;
-                            tempGridHeight = parsedHeight;
-                            setState({ gridWidth: tempGridWidth, gridHeight: tempGridHeight });
-                            setupCanvasDimensions();
-                            worker.postMessage({ type: 'init', payload: { gridWidth: state.gridWidth, gridHeight: state.gridHeight } });
-                        }
-                    }
 
                     if (encodedGrid) {
-                        const decodedRleGrid = atob(encodedGrid);
-                        let decodedGridArray = new Uint8Array(tempGridWidth * tempGridHeight);
+                        const decodedRleGrid = atob(encodedGrid); // Base64 decode
+                        let decodedGridArray = new Uint8Array(state.gridWidth * state.gridHeight);
                         let currentIdx = 0;
                         let num = '';
+                        // Decode RLE string back to Uint8Array
                         for (let i = 0; i < decodedRleGrid.length; i++) {
                             const char = decodedRleGrid[i];
-                            if (char === '0' || char === '1' || char === '2') { // Allow decoding state 2
+                            if (char === '0' || char === '1') { // If it's a state character
                                 const count = parseInt(num);
                                 const stateValue = parseInt(char);
                                 for (let j = 0; j < count && currentIdx < decodedGridArray.length; j++) {
                                     decodedGridArray[currentIdx++] = stateValue;
                                 }
-                                num = '';
-                            } else {
+                                num = ''; // Reset number buffer
+                            } else { // If it's a number character
                                 num += char;
                             }
                         }
-                        let finalGrid = new Uint8Array(state.gridWidth * state.gridHeight);
-                        const copyLength = Math.min(decodedGridArray.length, finalGrid.length);
-                        finalGrid.set(decodedGridArray.slice(0, copyLength));
-                        setState({ currentGrid: finalGrid });
+                        setState({ currentGrid: decodedGridArray });
                     }
 
                     if (ruleStr) {
@@ -1360,92 +1036,34 @@
                         setState({ rules: { ...state.rules, neighborhood: neighborhood } });
                     }
 
-                    if (boundary && (boundary === 'toroidal' || boundary === 'finite')) {
-                        setState({ rules: { ...state.rules, boundary: boundary } });
-                    }
-
                     if (aliveColor) setState({ cellColors: { ...state.cellColors, alive: `#${aliveColor}` } });
                     if (deadColor) setState({ cellColors: { ...state.cellColors, dead: `#${deadColor}` } });
-                    if (dyingColor) setState({ cellColors: { ...state.cellColors, dying: `#${dyingColor}` } }); // New: apply dying color
                     if (gridLines !== null) setState({ gridLinesVisible: gridLines === '1' });
                     if (zoom) setState({ zoomLevel: parseFloat(zoom) });
-                    if (panX !== null && panY !== null) setState({ panOffsetX: parseFloat(panX), panOffsetY: parseFloat(panY) }); // New: apply pan
 
+                    // Recalculate live cells and reset generation counter for loaded state
                     state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
                     state.generation = 0;
-                    pushToHistory();
                     updateStatusBar();
-                    drawGrid();
-                    showToast('State loaded from URL!', 'info');
-                    return true;
+                    drawGrid(); // Redraw the canvas with loaded state
+                    return true; // State was successfully decoded
                 } catch (e) {
                     console.error("Failed to decode state from URL:", e);
-                    showToast('Failed to load state from URL. Invalid link.', 'error');
-                    return false;
+                    return false; // Decoding failed
                 }
             }
 
 
             // --- Status Bar Update ---
+            // Updates the text content of the status bar elements.
             function updateStatusBar() {
                 generationCountSpan.textContent = state.generation;
                 liveCellCountSpan.textContent = state.liveCells;
-                fpsCountSpan.textContent = state.fps.toFixed(0);
+                fpsCountSpan.textContent = state.fps.toFixed(0); // Display FPS as integer
             }
-
-            // --- Toast Notification System ---
-            function showToast(message, type = 'info') {
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                toast.textContent = message;
-                toastContainer.appendChild(toast);
-
-                void toast.offsetWidth; // Force reflow
-
-                toast.classList.add('show');
-
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                    toast.classList.add('hide');
-                    toast.addEventListener('transitionend', () => {
-                        toast.remove();
-                    }, { once: true });
-                }, TOAST_DISPLAY_TIME);
-            }
-
-            // --- Responsive Panel Logic ---
-            function togglePanel(contentElement, toggleButton) {
-                const isExpanded = contentElement.classList.toggle('expanded');
-                const svg = toggleButton.querySelector('svg');
-                if (isExpanded) {
-                    svg.classList.remove('rotate-90');
-                } else {
-                    svg.classList.add('rotate-90');
-                }
-            }
-
-            function setPanelStateBasedOnWidth() {
-                if (window.innerWidth > 1024) {
-                    // Desktop view: ensure panels are fully visible and toggle buttons are hidden
-                    controlPanelContent.classList.add('expanded');
-                    controlPanelToggleBtn.querySelector('svg').classList.remove('rotate-90');
-                    controlPanelToggleBtn.classList.add('hidden');
-                    ruleEditorPanelContent.classList.add('expanded');
-                    ruleEditorPanelToggleBtn.querySelector('svg').classList.remove('rotate-90');
-                    ruleEditorPanelToggleBtn.classList.add('hidden');
-                } else {
-                    // Mobile view: ensure panels are collapsed and toggle buttons are visible
-                    controlPanelContent.classList.remove('expanded');
-                    controlPanelToggleBtn.querySelector('svg').classList.add('rotate-90');
-                    controlPanelToggleBtn.classList.remove('hidden');
-                    ruleEditorPanelContent.classList.remove('expanded');
-                    ruleEditorPanelToggleBtn.querySelector('svg').classList.add('rotate-90');
-                    ruleEditorPanelToggleBtn.classList.remove('hidden');
-                }
-            }
-
 
             // --- Event Listeners Setup ---
+            // Attaches all necessary event listeners to UI elements.
             function setupEventListeners() {
                 // Simulation Controls
                 playPauseBtn.addEventListener('click', () => {
@@ -1457,134 +1075,56 @@
                 });
                 stepBtn.addEventListener('click', stepSimulation);
                 resetBtn.addEventListener('click', resetSimulation);
-
-                // Undo/Redo
-                undoBtn.addEventListener('click', undo);
-                redoBtn.addEventListener('click', redo);
-
                 speedSlider.addEventListener('input', (e) => {
                     setState({ simulationSpeed: Number(e.target.value) });
                 });
-
-                // Grid Dimensions
-                applyGridSizeBtn.addEventListener('click', applyGridSize);
 
                 // Drawing Tools
                 brushSizeSlider.addEventListener('input', (e) => {
                     setState({ brushSize: Number(e.target.value) });
                 });
-                fillGridBtn.addEventListener('click', () => {
-                    initializeGrid(true);
-                    showToast('Grid filled with live cells!', 'success');
-                });
-                clearGridBtn.addEventListener('click', () => {
-                    initializeGrid(false);
-                    showToast('Grid cleared!', 'success');
-                });
-                randomizeGridBtn.addEventListener('click', () => {
-                    randomizeGrid();
-                    showToast('Grid randomized!', 'success');
-                });
+                fillGridBtn.addEventListener('click', () => initializeGrid(true));
+                clearGridBtn.addEventListener('click', () => initializeGrid(false));
 
-                // Canvas Drawing & Panning Interaction
-                let lastGridX = -1, lastGridY = -1;
+                // Canvas Drawing Interaction
+                let lastGridX = -1, lastGridY = -1; // Track last drawn cell to optimize mousemove
                 canvas.addEventListener('mousedown', (e) => {
-                    if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle click or Shift + Left click for panning
-                        state.isPanning = true;
-                        state.lastPanX = e.clientX;
-                        state.lastPanY = e.clientY;
-                        canvas.classList.add('grabbing');
-                        e.preventDefault();
-                    } else if (e.button === 0 || e.button === 2) { // Left or Right click for drawing
+                    if (e.button === 0 || e.button === 2) { // Allow left click (draw) or right click (erase)
                         state.isDrawing = true;
-                        state.drawMode = (e.button === 0) ? 1 : 0; // 1 for alive, 0 for dead
-                        const rect = canvas.getBoundingClientRect();
-                        const clientX = e.clientX - rect.left;
-                        const clientY = e.clientY - rect.top;
-
-                        // Convert client coordinates to grid coordinates, accounting for zoom and pan
-                        const gridX = Math.floor(((clientX / state.zoomLevel) - state.panOffsetX) / BASE_CELL_SIZE_PX);
-                        const gridY = Math.floor(((clientY / state.zoomLevel) - state.panOffsetY) / BASE_CELL_SIZE_PX);
-
-                        drawBrush(gridX, gridY, state.drawMode);
-                        lastGridX = gridX;
-                        lastGridY = gridY;
-                        e.preventDefault();
+                        state.drawMode = (e.button === 0) ? 1 : 0; // 1 for alive, 0 for dead (erase)
+                        const rect = canvas.getBoundingClientRect(); // Get canvas position and size
+                        // Calculate mouse position relative to canvas, considering CSS scaling
+                        const canvasX = e.clientX - rect.left;
+                        const canvasY = e.clientY - rect.top;
+                        drawBrush(canvasX, canvasY, state.drawMode);
+                        // Store the grid coordinates of the cell under the mouse
+                        lastGridX = Math.floor(canvasX / (BASE_CELL_SIZE_PX * state.zoomLevel));
+                        lastGridY = Math.floor(canvasY / (BASE_CELL_SIZE_PX * state.zoomLevel));
+                        e.preventDefault(); // Prevent default right-click context menu
                     }
                 });
                 canvas.addEventListener('mousemove', (e) => {
-                    if (state.isPanning) {
-                        const dx = e.clientX - state.lastPanX;
-                        const dy = e.clientY - state.lastPanY;
-                        setState({
-                            panOffsetX: state.panOffsetX + dx / state.zoomLevel,
-                            panOffsetY: state.panOffsetY + dy / state.zoomLevel,
-                            lastPanX: e.clientX,
-                            lastPanY: e.clientY
-                        });
-                    } else if (state.isDrawing) {
-                        const rect = canvas.getBoundingClientRect();
-                        const clientX = e.clientX - rect.left;
-                        const clientY = e.clientY - rect.top;
+                    if (!state.isDrawing) return; // Only draw if mouse button is held down
+                    const rect = canvas.getBoundingClientRect();
+                    const canvasX = e.clientX - rect.left;
+                    const canvasY = e.clientY - rect.top;
+                    const currentGridX = Math.floor(canvasX / (BASE_CELL_SIZE_PX * state.zoomLevel));
+                    const currentGridY = Math.floor(canvasY / (BASE_CELL_SIZE_PX * state.zoomLevel));
 
-                        const currentGridX = Math.floor(((clientX / state.zoomLevel) - state.panOffsetX) / BASE_CELL_SIZE_PX);
-                        const currentGridY = Math.floor(((clientY / state.zoomLevel) - state.panOffsetY) / BASE_CELL_SIZE_PX);
-
-                        if (currentGridX !== lastGridX || currentGridY !== lastGridY) {
-                            drawBrush(currentGridX, currentGridY, state.drawMode);
-                            lastGridX = currentGridX;
-                            lastGridY = currentGridY;
-                        }
+                    // Only draw if the brush has moved to a new cell to avoid redundant redraws
+                    if (currentGridX !== lastGridX || currentGridY !== lastGridY) {
+                        drawBrush(canvasX, canvasY, state.drawMode);
+                        lastGridX = currentGridX;
+                        lastGridY = currentGridY;
                     }
                 });
                 canvas.addEventListener('mouseup', () => {
-                    if (state.isPanning) {
-                        state.isPanning = false;
-                        canvas.classList.remove('grabbing');
-                    } else if (state.isDrawing) {
-                        state.isDrawing = false;
-                        state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
-                        pushToHistory();
-                        updateStatusBar();
-                    }
+                    state.isDrawing = false; // Stop drawing when mouse button is released
+                    // Update live cell count after drawing is finished
+                    state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
+                    updateStatusBar();
                 });
-                canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-                // Mouse wheel zoom
-                canvas.addEventListener('wheel', (e) => {
-                    e.preventDefault();
-                    const zoomChange = e.deltaY * -0.001;
-                    let newZoom = state.zoomLevel + zoomChange;
-                    newZoom = Math.max(parseFloat(zoomSlider.min), Math.min(parseFloat(zoomSlider.max), newZoom));
-                    newZoom = Math.round(newZoom / parseFloat(zoomSlider.step)) * parseFloat(zoomSlider.step);
-                    setState({ zoomLevel: newZoom });
-                    zoomSlider.value = newZoom;
-                });
-
-                // Keyboard Shortcuts
-                document.addEventListener('keydown', (e) => {
-                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
-                        return; // Don't interfere with typing
-                    }
-
-                    if (e.code === 'Space') {
-                        e.preventDefault();
-                        playPauseBtn.click();
-                    } else if (e.key === 'ArrowRight') {
-                        e.preventDefault();
-                        stepBtn.click();
-                    } else if (e.key === 'r' || e.key === 'R') {
-                        e.preventDefault();
-                        resetBtn.click();
-                    } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') { // Ctrl+Z or Cmd+Z
-                        e.preventDefault();
-                        undoBtn.click();
-                    } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { // Ctrl+Y or Cmd+Y
-                        e.preventDefault();
-                        redoBtn.click();
-                    }
-                });
-
+                canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent default right-click menu
 
                 // Rule Editor
                 ruleInput.addEventListener('input', (e) => {
@@ -1598,18 +1138,10 @@
                         setState({ rules: { ...state.rules, neighborhood: e.target.value } });
                     });
                 });
-                boundaryTypeRadios.forEach(radio => {
-                    radio.addEventListener('change', (e) => {
-                        setState({ rules: { ...state.rules, boundary: e.target.value } });
-                    });
-                });
 
                 // Visual Settings
                 aliveColorPicker.addEventListener('input', (e) => {
                     setState({ cellColors: { ...state.cellColors, alive: e.target.value } });
-                });
-                dyingColorPicker.addEventListener('input', (e) => { // New: Dying color picker listener
-                    setState({ cellColors: { ...state.cellColors, dying: e.target.value } });
                 });
                 deadColorPicker.addEventListener('input', (e) => {
                     setState({ cellColors: { ...state.cellColors, dead: e.target.value } });
@@ -1620,118 +1152,59 @@
                 zoomSlider.addEventListener('input', (e) => {
                     setState({ zoomLevel: Number(e.target.value) });
                 });
-                shareLinkBtn.addEventListener('click', encodeStateToUrl);
+                shareLinkBtn.addEventListener('click', encodeStateToUrl); // Share button
 
                 // Pattern Presets & Persistence
                 presetSelect.addEventListener('change', (e) => {
                     if (e.target.value) {
                         loadPreset(e.target.value);
-                        e.target.value = '';
+                        e.target.value = ''; // Reset select to prompt user for next selection
                     }
                 });
-                savePatternBtn.addEventListener('click', () => {
-                    // Show the custom save pattern modal
-                    savePatternNameInput.value = ''; // Clear previous input
-                    savePatternModal.classList.remove('hidden');
-                    setTimeout(() => savePatternModal.classList.add('show'), 10);
-                    savePatternNameInput.focus(); // Focus input for immediate typing
-                });
-
-                confirmSavePatternBtn.addEventListener('click', () => {
-                    const patternName = savePatternNameInput.value.trim();
-                    if (!patternName) {
-                        showToast('Pattern name cannot be empty.', 'error');
-                        return;
-                    }
-                    if (state.savedPatterns[patternName]) {
-                        if (!confirm(`A pattern named "${patternName}" already exists. Overwrite?`)) {
-                            showToast('Pattern save cancelled (overwrite).', 'info');
-                            closeSavePatternModal();
-                            return;
-                        }
-                    }
-                    saveCurrentPattern(patternName);
-                    showToast(`Pattern "${patternName}" saved!`, 'success');
-                    closeSavePatternModal();
-                });
-
-                cancelSavePatternBtn.addEventListener('click', () => {
-                    showToast('Pattern save cancelled.', 'info');
-                    closeSavePatternModal();
-                });
-
-                function closeSavePatternModal() {
-                    savePatternModal.classList.remove('show');
-                    savePatternModal.addEventListener('transitionend', function handler() {
-                        savePatternModal.classList.add('hidden');
-                        savePatternModal.removeEventListener('transitionend', handler);
-                    }, { once: true });
-                }
-
+                savePatternBtn.addEventListener('click', saveCurrentPattern);
                 loadPatternBtn.addEventListener('click', loadSavedPatterns);
-                closeModalBtn.addEventListener('click', () => {
-                    loadPatternModal.classList.remove('show');
-                    loadPatternModal.addEventListener('transitionend', function handler() {
-                        loadPatternModal.classList.add('hidden');
-                        loadPatternModal.removeEventListener('transitionend', handler);
-                    }, { once: true });
-                });
-
-                // Responsive Panel Toggles
-                controlPanelToggleBtn.addEventListener('click', () => togglePanel(controlPanelContent, controlPanelToggleBtn));
-                ruleEditorPanelToggleBtn.addEventListener('click', () => togglePanel(ruleEditorPanelContent, ruleEditorPanelToggleBtn));
-                window.addEventListener('resize', setPanelStateBasedOnWidth);
+                closeModalBtn.addEventListener('click', () => loadPatternModal.classList.add('hidden'));
             }
 
             // --- Initialization Function ---
+            // This function runs when the DOM is fully loaded.
             function init() {
-                gridWidthInput.value = state.gridWidth;
-                gridHeightInput.value = state.gridHeight;
-
-                setupCanvasDimensions();
-                setupWorker();
-                initializeGrid(false);
-
-                setupEventListeners();
+                setupCanvasDimensions(); // Set the canvas's internal pixel dimensions
+                setupWorker(); // Initialize the Web Worker for computation
+                initializeGrid(false); // Start with an empty grid
+                setupEventListeners(); // Attach all UI event handlers
+                // Dynamically create checkboxes for visual rule builder
                 createRuleCheckboxes(birthConditionsDiv, 'birth');
                 createRuleCheckboxes(survivalConditionsDiv, 'survival');
 
-                const urlStateLoaded = decodeStateFromUrl();
-
-                if (!urlStateLoaded) {
-                    updateRuleUIFromState();
+                // Attempt to decode state from URL hash first (for shared links)
+                if (!decodeStateFromUrl()) {
+                    // If no state was loaded from URL, set default UI values
+                    ruleInput.value = generateRuleString(state.rules.birth, state.rules.survival);
+                    neighborhoodTypeRadios.forEach(radio => {
+                        if (radio.value === state.rules.neighborhood) radio.checked = true;
+                    });
                     aliveColorPicker.value = state.cellColors.alive;
-                    dyingColorPicker.value = state.cellColors.dying; // Set initial dying color
                     deadColorPicker.value = state.cellColors.dead;
                     gridLinesToggle.checked = state.gridLinesVisible;
                     speedSlider.value = state.simulationSpeed;
                     brushSizeSlider.value = state.brushSize;
                     zoomSlider.value = state.zoomLevel;
+                    updateRuleUIFromState(); // Sync visual rule builder checkboxes
+                    // Trigger initial updates for sliders to display their values
                     setState({
                         simulationSpeed: state.simulationSpeed,
                         brushSize: state.brushSize,
-                        zoomLevel: state.zoomLevel,
-                        history: state.history,
-                        historyIndex: state.historyIndex,
-                        panOffsetX: state.panOffsetX, // Ensure initial pan is set
-                        panOffsetY: state.panOffsetY
+                        zoomLevel: state.zoomLevel
                     });
-                    drawGrid();
                 }
-
-                // Set initial panel state based on screen width
-                setPanelStateBasedOnWidth();
+                drawGrid(); // Perform an initial draw of the grid
             }
 
+            // Ensure `init` runs only after the entire DOM is loaded
             document.addEventListener('DOMContentLoaded', init);
-        })();
+        })(); // End of IIFE
     </script>
-
-    <div style="position:fixed;bottom:5px;right:5px;color:#9ca3af;font-family:sans-serif;font-size:10px;text-align:right;">
-        <a href="#" class="hover:text-blue-400">Cellular Cosmos Sandbox</a><br>
-        <span class="text-gray-500">Powered by Holy Grail. A Dakota Rain Lock Invention.</span>
-    </div>
-
 
     <div style="position:fixed;bottom:10px;right:10px;background:rgba(0,0,0,0.7);color:white;padding:5px 10px;border-radius:5px;font-family:sans-serif;font-size:12px">
         Created by Dakota Rain Lock, powered by Holy Grail. A Dakota Rain Lock Invention.
