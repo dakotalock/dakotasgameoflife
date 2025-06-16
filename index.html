@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cellular Cosmos Sandbox</title>
+    <!-- Tailwind CSS CDN for rapid styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for main layout and canvas to ensure responsiveness and proper display */
+        html, body, #app {
+            height: 100%;
+            margin: 0;
+            overflow: hidden; /* Prevents scrollbars on the main layout */
+        }
+        #app {
+            display: grid;
+            grid-template-rows: 1fr auto; /* Main content area (canvas + sidebars) and then status bar */
+            grid-template-columns: 280px 1fr 280px; /* Left sidebar, central canvas, right sidebar */
+            gap: 1rem; /* Spacing between grid items */
+            padding: 1rem;
+            background-color: #1a202c; /* Dark background for the whole app */
+            color: #e2e8f0; /* Light text color */
+        }
+
+        /* Responsive adjustments for smaller screens (tablets and mobile) */
+        @media (max-width: 1024px) {
+            #app {
+                /* Stack elements vertically: Controls, Rules, Canvas, Status */
+                grid-template-rows: auto auto 1fr auto;
+                grid-template-columns: 1fr; /* Single column layout */
+                padding: 0.5rem;
+                gap: 0.5rem;
+            }
+            /* Make sidebars scrollable if content overflows */
+            #control-panel, #rule-editor-panel {
+                max-height: none; /* Allow panels to expand/collapse with content */
+                overflow-y: visible; /* Handled by panel-content now */
+            }
+            #main-canvas-area {
+                min-height: 300px; /* Ensure canvas area has a minimum visible height */
+            }
+        }
+        /* Desktop layout (default grid definitions) */
+        @media (min-width: 1024px) {
+            #control-panel {
+                grid-column: 1;
+                grid-row: 1;
+            }
+            #main-canvas-area {
+                grid-column: 2;
+                grid-row: 1;
+            }
+            #rule-editor-panel {
+                grid-column: 3;
+                grid-row: 1;
+            }
+            #status-bar {
+                grid-column: 1 / span 3; /* Span all three columns at the bottom */
+                grid-row: 2;
+            }
+        }
+
+        /* Common styles for panels using Tailwind's @apply directive */
+        .panel {
+            @apply bg-gray-800 p-4 rounded-lg shadow-lg flex flex-col gap-4;
+        }
+        .panel-header {
+            @apply border-b border-gray-700 pb-2 mb-2 flex justify-between items-center;
+        }
+        .panel-header .section-title {
+            @apply mb-0; /* Remove default margin-bottom from section-title */
+        }
+        .panel-toggle-btn {
+            @apply text-gray-400 hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 rounded;
+        }
+        /* Panel content for responsive collapse/expand */
+        @media (max-width: 1024px) {
+            .panel-content {
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+                padding-top: 0;
+                padding-bottom: 0;
+                /* Adjust padding-left/right if needed to match header */
+                margin-left: -1rem; /* Counteract panel's padding-left */
+                margin-right: -1rem; /* Counteract panel's padding-right */
+                padding-left: 1rem; /* Restore content padding */
+                padding-right: 1rem; /* Restore content padding */
+                display: flex; /* Ensure flex layout for children */
+                flex-direction: column;
+                gap: 1rem; /* Restore gap for children */
+            }
+            .panel-content.expanded {
+                max-height: 40vh; /* Limit height when expanded on mobile */
+                padding-top: 1rem;
+                padding-bottom: 1rem;
+            }
+            /* Override default panel padding for collapsed state, keep for header */
+            #control-panel, #rule-editor-panel {
+                padding: 1rem;
+            }
+        }
+
+        .btn {
+            @apply bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200;
+        }
+        .btn-secondary {
+            @apply bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200;
+        }
+        .input-field {
+            @apply w-full p-2 rounded-md bg-gray-700 text-gray-200 border border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50;
+        }
+        .slider-label {
+            @apply block text-sm font-medium text-gray-300 mb-1;
+        }
+        .checkbox-label {
+            @apply flex items-center cursor-pointer;
+        }
+        .checkbox-label input[type="checkbox"], .form-radio {
+            @apply h-4 w-4 text-blue-600 bg-gray-700 rounded border-gray-600 focus:ring-blue-500;
+        }
+        .form-radio {
+            @apply rounded-full; /* Make radio buttons round */
+        }
+        .color-picker-label {
+            @apply flex items-center justify-between text-sm font-medium text-gray-300;
+        }
+        .color-picker-input {
+            @apply w-12 h-8 rounded-md border border-gray-600 cursor-pointer;
+        }
+        /* Canvas specific styles */
+        canvas {
+            display: block; /* Removes extra space below canvas */
+            background-color: #000; /* Default background for dead cells / empty grid */
+            max-width: 100%; /* Ensures canvas scales down to fit parent horizontally */
+            max-height: 100%; /* Ensures canvas scales down to fit parent vertically */
+            image-rendering: pixelated; /* For sharp pixel rendering when zoomed */
+            cursor: grab; /* Default cursor for panning */
+        }
+        canvas.grabbing {
+            cursor: grabbing;
+        }
+        /* Custom styles for rule builder checkboxes to make them look like toggles/buttons */
+        .rule-checkbox-item {
+            @apply flex items-center justify-center p-2 rounded-md border border-gray-600 bg-gray-700 cursor-pointer transition-colors duration-150;
+        }
+        .rule-checkbox-item input[type="checkbox"] {
+            @apply hidden; /* Hide default checkbox */
+        }
+        .rule-checkbox-item span {
+            @apply text-gray-300 font-medium text-sm;
+        }
+        .rule-checkbox-item input[type="checkbox"]:checked + span {
+            @apply text-blue-300; /* Text color when checked */
+        }
+        .rule-checkbox-item input[type="checkbox"]:checked {
+            @apply bg-blue-600 border-blue-500; /* Background/border when checked */
+        }
+        .rule-checkbox-item:hover {
+            @apply bg-gray-600; /* Hover effect */
+        }
+        .rule-checkbox-item input[type="checkbox"]:checked:hover {
+            @apply bg-blue-700; /* Hover effect when checked */
+        }
+        /* Add focus styles for accessibility */
+        .rule-checkbox-item:focus-within {
+            @apply ring-2 ring-blue-500 ring-opacity-75;
+        }
+
+        /* Modal specific styles for animation */
+        .modal-overlay {
+            @apply fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out;
+        }
+        .modal-content {
+            @apply bg-gray-800 p-6 rounded-lg shadow-xl w-96 transform transition-transform duration-300 ease-in-out scale-95;
+        }
+        .modal-overlay.show {
+            @apply opacity-100;
+        }
+        .modal-overlay.show .modal-content {
+            @apply scale-100;
+        }
+        .modal-overlay.hidden {
+            @apply opacity-0 pointer-events-none; /* Hide and disable interactions when fully faded out */
+        }
+        .modal-overlay.hidden .modal-content {
+            @apply scale-95;
+        }
+
+        /* Toast Notification Styles */
+        .toast {
+            @apply bg-gray-900 text-white px-4 py-2 rounded-md shadow-lg opacity-0 transform translate-y-4 transition-all duration-300 ease-out;
+            min-width: 200px;
+            text-align: center;
+        }
+        .toast.show {
+            @apply opacity-100 translate-y-0;
+        }
+        .toast.hide {
+            @apply opacity-0 translate-y-4;
+        }
+        .toast.success {
+            @apply bg-green-600;
+        }
+        .toast.error {
+            @apply bg-red-600;
+        }
+        .toast.info {
+            @apply bg-blue-600;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+    <div id="app" class="min-h-screen">
+        <!-- Left Sidebar: Control Panel -->
+        <aside id="control-panel" class="panel">
+            <div class="panel-header">
+                <h2 class="section-title">Simulation Controls</h2>
+                <button class="panel-toggle-btn lg:hidden" aria-label="Toggle Simulation Controls Panel">
+                    <svg class="w-6 h-6 transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+            </div>
+            <div class="panel-content">
+                <div class="flex gap-2">
+                    <button id="playPauseBtn" class="btn flex-1" aria-label="Play or Pause Simulation">Play</button>
+                    <button id="stepBtn" class="btn-secondary" aria-label="Step one generation forward">Step</button>
+                    <button id="resetBtn" class="btn-secondary" aria-label="Reset simulation grid">Reset</button>
+                </div>
+                <!-- New: Undo/Redo Buttons -->
+                <div class="flex gap-2">
+                    <button id="undoBtn" class="btn-secondary flex-1" aria-label="Undo last generation or drawing action" disabled>Undo</button>
+                    <button id="redoBtn" class="btn-secondary flex-1" aria-label="Redo next generation or drawing action" disabled>Redo</button>
+                </div>
+                <div>
+                    <label for="speedSlider" class="slider-label">Speed: <span id="speedValue">10x</span></label>
+                    <input type="range" id="speedSlider" min="1" max="60" value="10" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="10 generations per second">
+                </div>
+
+                <h2 class="section-title">Grid Dimensions</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label for="gridWidthInput" class="slider-label">Width:</label>
+                        <input type="number" id="gridWidthInput" value="100" min="10" max="500" class="input-field" aria-label="Grid width">
+                    </div>
+                    <div>
+                        <label for="gridHeightInput" class="slider-label">Height:</label>
+                        <input type="number" id="gridHeightInput" value="100" min="10" max="500" class="input-field" aria-label="Grid height">
+                    </div>
+                </div>
+                <button id="applyGridSizeBtn" class="btn-secondary" aria-label="Apply new grid dimensions">Apply Grid Size</button>
+
+
+                <h2 class="section-title">Drawing Tools</h2>
+                <div>
+                    <label for="brushSizeSlider" class="slider-label">Brush Size: <span id="brushSizeValue">1</span></label>
+                    <input type="range" id="brushSizeSlider" min="1" max="5" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="1 pixel brush size">
+                </div>
+                <div class="flex gap-2">
+                    <button id="fillGridBtn" class="btn-secondary flex-1" aria-label="Fill entire grid with live cells">Fill Grid</button>
+                    <button id="clearGridBtn" class="btn-secondary flex-1" aria-label="Clear all cells from grid">Clear Grid</button>
+                </div>
+                <button id="randomizeGridBtn" class="btn-secondary" aria-label="Randomize grid with live and dead cells">Randomize Grid</button>
+
+
+                <h2 class="section-title">Pattern Presets</h2>
+                <select id="presetSelect" class="input-field" aria-label="Select a predefined pattern to load">
+                    <option value="">Select a preset...</option>
+                    <option value="glider">Glider (Conway)</option>
+                    <option value="lightWeightSpaceship">Light-weight Spaceship (Conway)</option>
+                    <option value="gosperGliderGun">Gosper Glider Gun (Conway)</option>
+                    <option value="pulsar">Pulsar (Conway)</option>
+                    <option value="tenCellRow">10 Cell Row (Conway)</option>
+                </select>
+                <div class="flex gap-2">
+                    <button id="savePatternBtn" class="btn-secondary flex-1" aria-label="Save current pattern to local storage">Save Pattern</button>
+                    <button id="loadPatternBtn" class="btn-secondary flex-1" aria-label="Load a pattern from local storage">Load Pattern</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Canvas Area -->
+        <main id="main-canvas-area" class="bg-gray-800 rounded-lg shadow-lg flex items-center justify-center relative overflow-hidden">
+            <canvas id="cellularCanvas" role="img" aria-label="Cellular Automata Grid"></canvas>
+        </main>
+
+        <!-- Right Sidebar: Rule Editor & Visual Settings -->
+        <aside id="rule-editor-panel" class="panel">
+            <div class="panel-header">
+                <h2 class="section-title">Cellular Automata Rules</h2>
+                <button class="panel-toggle-btn lg:hidden" aria-label="Toggle Rule Editor Panel">
+                    <svg class="w-6 h-6 transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+            </div>
+            <div class="panel-content">
+                <div>
+                    <label for="ruleInput" class="slider-label">Rule (B/S notation):</label>
+                    <input type="text" id="ruleInput" value="B3/S23" class="input-field" aria-label="Cellular automata rule in B slash S notation, e.g., B3/S23 for Game of Life" placeholder="e.g., B3/S23 (Conway's Game of Life)">
+                    <p class="text-xs text-gray-400 mt-1">Example: B3/S23 (Conway's Game of Life)</p>
+                </div>
+
+                <h3 class="font-semibold text-gray-300 mt-2">Neighborhood Type:</h3>
+                <div class="flex gap-4 mt-1">
+                    <label class="checkbox-label">
+                        <input type="radio" name="neighborhoodType" value="moore" checked class="form-radio" aria-label="Moore neighborhood type (8 surrounding cells)">
+                        <span class="ml-2">Moore (8 neighbors)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="radio" name="neighborhoodType" value="vonNeumann" class="form-radio" aria-label="Von Neumann neighborhood type (4 adjacent cells)">
+                        <span class="ml-2">Von Neumann (4 neighbors)</span>
+                    </label>
+                </div>
+
+                <!-- New: Boundary Type -->
+                <h3 class="font-semibold text-gray-300 mt-2">Boundary Type:</h3>
+                <div class="flex gap-4 mt-1">
+                    <label class="checkbox-label">
+                        <input type="radio" name="boundaryType" value="toroidal" checked class="form-radio" aria-label="Toroidal boundary (wrap-around)">
+                        <span class="ml-2">Toroidal (Wrap-around)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="radio" name="boundaryType" value="finite" class="form-radio" aria-label="Finite boundary (no wrap-around)">
+                        <span class="ml-2">Finite (No wrap)</span>
+                    </label>
+                </div>
+
+                <h3 class="font-semibold text-gray-300 mt-2">Visual Rule Builder:</h3>
+                <div class="grid grid-cols-3 gap-2 text-sm">
+                    <div class="font-semibold text-blue-300 col-span-3">Birth Conditions (dead cell becomes alive):</div>
+                    <div id="birthConditions" class="col-span-3 grid grid-cols-5 gap-2" role="group" aria-labelledby="birth-conditions-title">
+                        <!-- Checkboxes for 0-8 will be generated here by JavaScript -->
+                    </div>
+                    <div class="font-semibold text-blue-300 col-span-3 mt-2">Survival Conditions (alive cell remains alive):</div>
+                    <div id="survivalConditions" class="col-span-3 grid grid-cols-5 gap-2" role="group" aria-labelledby="survival-conditions-title">
+                        <!-- Checkboxes for 0-8 will be generated here by JavaScript -->
+                    </div>
+                </div>
+
+                <h2 class="section-title mt-4">Visual Settings</h2>
+                <div>
+                    <label class="color-picker-label">
+                        Alive Cell Color:
+                        <input type="color" id="aliveColorPicker" value="#00FF00" class="color-picker-input" aria-label="Color for alive cells">
+                    </label>
+                </div>
+                <div>
+                    <label class="color-picker-label">
+                        Dying Cell Color:
+                        <input type="color" id="dyingColorPicker" value="#FF8C00" class="color-picker-input" aria-label="Color for dying cells">
+                    </label>
+                </div>
+                <div>
+                    <label class="color-picker-label">
+                        Dead Cell Color:
+                        <input type="color" id="deadColorPicker" value="#000000" class="color-picker-input" aria-label="Color for dead cells">
+                    </label>
+                </div>
+                <div>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="gridLinesToggle" checked class="form-checkbox" aria-label="Toggle grid lines visibility">
+                        <span class="ml-2">Show Grid Lines</span>
+                    </label>
+                </div>
+                <div>
+                    <label for="zoomSlider" class="slider-label">Zoom: <span id="zoomValue">1.0x</span></label>
+                    <input type="range" id="zoomSlider" min="0.5" max="5" step="0.1" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" aria-valuetext="1 times zoom">
+                </div>
+                <button id="shareLinkBtn" class="btn-secondary" aria-label="Generate shareable link for current state">Share Current State</button>
+            </div>
+        </aside>
+
+        <!-- Bottom: Status Bar -->
+        <footer id="status-bar" class="bg-gray-800 p-3 rounded-lg shadow-lg flex justify-around items-center text-sm font-semibold" aria-live="polite" aria-atomic="true">
+            <span>Generation: <span id="generationCount">0</span></span>
+            <span>Live Cells: <span id="liveCellCount">0</span></span>
+            <span>FPS: <span id="fpsCount">0</span></span>
+        </footer>
+    </div>
+
+    <!-- Modals for saved patterns -->
+    <div id="loadPatternModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="loadPatternModalTitle">
+        <div class="modal-content">
+            <h3 id="loadPatternModalTitle" class="text-xl font-semibold mb-4">Load Saved Pattern</h3>
+            <div id="modalSavedPatternsList" class="max-h-60 overflow-y-auto mb-4 bg-gray-700 p-2 rounded">
+                <p class="text-gray-400">No saved patterns found.</p>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button id="closeModalBtn" class="btn-secondary" aria-label="Close load pattern dialog">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Modal for Saving Pattern -->
+    <div id="savePatternModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="savePatternModalTitle">
+        <div class="modal-content">
+            <h3 id="savePatternModalTitle" class="text-xl font-semibold mb-4">Save Current Pattern</h3>
+            <input type="text" id="savePatternNameInput" class="input-field mb-4" placeholder="Enter pattern name" aria-label="Enter name for the pattern to save">
+            <div class="flex justify-end gap-2">
+                <button id="cancelSavePatternBtn" class="btn-secondary" aria-label="Cancel saving pattern">Cancel</button>
+                <button id="confirmSavePatternBtn" class="btn" aria-label="Confirm saving pattern">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none">
+        <!-- Toasts will be injected here -->
+    </div>
+
+
+    <script>
+        // Encapsulate all application logic within an immediately invoked function expression (IIFE)
+        // to prevent global scope pollution.
+        (function() {
+            // --- Configuration Constants ---
+            const BASE_CELL_SIZE_PX = 8; // Base pixel size for a cell before any zoom is applied
+            const LOCAL_STORAGE_KEY = 'cellularCosmosPatterns'; // Key for storing user patterns in local storage
+            const MAX_HISTORY_SIZE = 50; // Max number of grid states to store for undo/redo
+            const TOAST_DISPLAY_TIME = 3000; // Milliseconds for toast to display
+
+            // --- DOM Element References ---
+            // Cache references to frequently used DOM elements for performance
+            const canvas = document.getElementById('cellularCanvas');
+            const ctx = canvas.getContext('2d'); // Get 2D rendering context for the canvas
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const stepBtn = document.getElementById('stepBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            const speedSlider = document.getElementById('speedSlider');
+            const speedValueSpan = document.getElementById('speedValue');
+            const gridWidthInput = document.getElementById('gridWidthInput');
+            const gridHeightInput = document.getElementById('gridHeightInput');
+            const applyGridSizeBtn = document.getElementById('applyGridSizeBtn');
+            const brushSizeSlider = document.getElementById('brushSizeSlider');
+            const brushSizeValueSpan = document.getElementById('brushSizeValue');
+            const fillGridBtn = document.getElementById('fillGridBtn');
+            const clearGridBtn = document.getElementById('clearGridBtn');
+            const randomizeGridBtn = document.getElementById('randomizeGridBtn');
+            const presetSelect = document.getElementById('presetSelect');
+            const savePatternBtn = document.getElementById('savePatternBtn');
+            const loadPatternBtn = document.getElementById('loadPatternBtn');
+            const ruleInput = document.getElementById('ruleInput');
+            const neighborhoodTypeRadios = document.querySelectorAll('input[name="neighborhoodType"]');
+            const boundaryTypeRadios = document.querySelectorAll('input[name="boundaryType"]');
+            const birthConditionsDiv = document.getElementById('birthConditions');
+            const survivalConditionsDiv = document.getElementById('survivalConditions');
+            const aliveColorPicker = document.getElementById('aliveColorPicker');
+            const dyingColorPicker = document.getElementById('dyingColorPicker'); // New
+            const deadColorPicker = document.getElementById('deadColorPicker');
+            const gridLinesToggle = document.getElementById('gridLinesToggle');
+            const zoomSlider = document.getElementById('zoomSlider');
+            const zoomValueSpan = document.getElementById('zoomValue');
+            const generationCountSpan = document.getElementById('generationCount');
+            const liveCellCountSpan = document.getElementById('liveCellCount');
+            const fpsCountSpan = document.getElementById('fpsCount');
+            const loadPatternModal = document.getElementById('loadPatternModal');
+            const modalSavedPatternsList = document.getElementById('modalSavedPatternsList');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const savePatternModal = document.getElementById('savePatternModal'); // New
+            const savePatternNameInput = document.getElementById('savePatternNameInput'); // New
+            const cancelSavePatternBtn = document.getElementById('cancelSavePatternBtn'); // New
+            const confirmSavePatternBtn = document.getElementById('confirmSavePatternBtn'); // New
+            const shareLinkBtn = document.getElementById('shareLinkBtn');
+            const toastContainer = document.getElementById('toastContainer');
+
+            // Responsive Panel Elements
+            const controlPanel = document.getElementById('control-panel');
+            const ruleEditorPanel = document.getElementById('rule-editor-panel');
+            const controlPanelToggleBtn = controlPanel.querySelector('.panel-toggle-btn');
+            const ruleEditorPanelToggleBtn = ruleEditorPanel.querySelector('.panel-toggle-btn');
+            const controlPanelContent = controlPanel.querySelector('.panel-content');
+            const ruleEditorPanelContent = ruleEditorPanel.querySelector('.panel-content');
+
+            // --- Application State ---
+            let state = {
+                gridWidth: 100, // Default initial width
+                gridHeight: 100, // Default initial height
+                currentGrid: new Uint8Array(100 * 100), // Initialized with default size, values 0, 1, or 2
+                simulationRunning: false,
+                animationFrameId: null,
+                generation: 0,
+                liveCells: 0,
+                simulationSpeed: 10,
+                framesToSkip: 0,
+                frameCounter: 0,
+                lastFrameTime: 0,
+                fps: 0,
+                brushSize: 1,
+                isDrawing: false,
+                drawMode: 1, // 0 for dead, 1 for alive
+                rules: {
+                    birth: new Set([3]),
+                    survival: new Set([2, 3]),
+                    neighborhood: 'moore',
+                    boundary: 'toroidal'
+                },
+                cellColors: {
+                    alive: '#00FF00',
+                    dead: '#000000',
+                    dying: '#FF8C00' // New: Dying cell color
+                },
+                gridLinesVisible: true,
+                zoomLevel: 1.0,
+                panOffsetX: 0, // New: for canvas panning
+                panOffsetY: 0, // New: for canvas panning
+                isPanning: false, // New: for canvas panning
+                lastPanX: 0, // New: for canvas panning
+                lastPanY: 0, // New: for canvas panning
+                savedPatterns: {},
+                history: [],
+                historyIndex: -1,
+                lastFpsUpdateTime: 0,
+                fpsFrameCount: 0
+            };
+
+            // --- Web Worker Setup ---
+            let worker;
+            const setupWorker = () => {
+                const workerCode = `
+                    let gridWidth, gridHeight;
+                    let currentGrid;
+                    let birthRules, survivalRules;
+                    let neighborhoodType;
+                    let boundaryType;
+
+                    function getIndex(x, y) {
+                        return y * gridWidth + x;
+                    }
+
+                    function getNeighborCount(x, y) {
+                        let count = 0;
+                        const neighbors = [];
+
+                        if (neighborhoodType === 'moore') {
+                            neighbors.push(
+                                [x - 1, y - 1], [x, y - 1], [x + 1, y - 1],
+                                [x - 1, y],                 [x + 1, y],
+                                [x - 1, y + 1], [x, y + 1], [x + 1, y + 1]
+                            );
+                        } else { // vonNeumann
+                            neighbors.push(
+                                [x, y - 1],
+                                [x - 1, y],
+                                [x + 1, y],
+                                [x, y + 1]
+                            );
+                        }
+
+                        for (const [nx, ny] of neighbors) {
+                            let finalX = nx;
+                            let finalY = ny;
+
+                            if (boundaryType === 'toroidal') { // Apply wrapping
+                                finalX = (nx + gridWidth) % gridWidth;
+                                finalY = (ny + gridHeight) % gridHeight;
+                                // Ensure positive modulo for negative numbers (JS % can return negative)
+                                finalX = finalX < 0 ? finalX + gridWidth : finalX;
+                                finalY = finalY < 0 ? finalY + gridHeight : finalY;
+                            } else { // Finite boundary: check if within bounds
+                                if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) {
+                                    continue; // Skip out-of-bounds neighbors
+                                }
+                            }
+
+                            // Only count 'alive' cells (state 1) as neighbors
+                            if (currentGrid[getIndex(finalX, finalY)] === 1) {
+                                count++;
+                            }
+                        }
+                        return count;
+                    }
+
+                    function computeNextGeneration() {
+                        const newGrid = new Uint8Array(gridWidth * gridHeight);
+                        let liveCellsCount = 0;
+
+                        for (let y = 0; y < gridHeight; y++) {
+                            for (let x = 0; x < gridWidth; x++) {
+                                const index = getIndex(x, y);
+                                const currentState = currentGrid[index];
+                                const liveNeighbors = getNeighborCount(x, y);
+
+                                if (currentState === 0) { // Dead cell
+                                    if (birthRules.has(liveNeighbors)) {
+                                        newGrid[index] = 1; // Becomes Alive
+                                        liveCellsCount++;
+                                    } else {
+                                        newGrid[index] = 0; // Remains Dead
+                                    }
+                                } else if (currentState === 1) { // Alive cell
+                                    if (survivalRules.has(liveNeighbors)) {
+                                        newGrid[index] = 1; // Remains Alive
+                                        liveCellsCount++;
+                                    } else {
+                                        newGrid[index] = 2; // Becomes Dying
+                                    }
+                                } else if (currentState === 2) { // Dying cell
+                                    newGrid[index] = 0; // Becomes Dead
+                                }
+                            }
+                        }
+                        return { newGrid, liveCellsCount };
+                    }
+
+                    self.onmessage = function(event) {
+                        const { type, payload } = event.data;
+
+                        if (type === 'init') {
+                            gridWidth = payload.gridWidth;
+                            gridHeight = payload.gridHeight;
+                        } else if (type === 'compute') {
+                            currentGrid = payload.currentGrid;
+                            birthRules = new Set(payload.birthRules);
+                            survivalRules = new Set(payload.survivalRules);
+                            neighborhoodType = payload.neighborhoodType;
+                            boundaryType = payload.boundaryType;
+                            const { newGrid, liveCellsCount } = computeNextGeneration();
+                            self.postMessage({ type: 'computed', newGrid, liveCellsCount }, [newGrid.buffer]);
+                        }
+                    };
+                `;
+
+                const blob = new Blob([workerCode], { type: 'application/javascript' });
+                const blobURL = URL.createObjectURL(blob);
+                worker = new Worker(blobURL);
+
+                worker.onmessage = function(event) {
+                    if (event.data.type === 'computed') {
+                        state.currentGrid = event.data.newGrid;
+                        state.liveCells = event.data.liveCellsCount;
+                        state.generation++;
+                        pushToHistory();
+                        updateStatusBar();
+                        drawGrid();
+
+                        if (state.simulationRunning) {
+                            state.animationFrameId = requestAnimationFrame(gameLoop);
+                        }
+                    }
+                };
+
+                // Send initial grid dimensions to the worker
+                worker.postMessage({ type: 'init', payload: { gridWidth: state.gridWidth, gridHeight: state.gridHeight } });
+            };
+
+            // --- State Management Helper ---
+            function setState(newState) {
+                Object.assign(state, newState);
+
+                if ('simulationRunning' in newState) {
+                    playPauseBtn.textContent = state.simulationRunning ? 'Pause' : 'Play';
+                    playPauseBtn.setAttribute('aria-label', state.simulationRunning ? 'Pause simulation' : 'Play simulation');
+                    stepBtn.disabled = state.simulationRunning;
+                }
+                if ('simulationSpeed' in newState) {
+                    speedValueSpan.textContent = `${state.simulationSpeed}x`;
+                    state.framesToSkip = Math.max(0, Math.floor(60 / state.simulationSpeed) - 1);
+                }
+                if ('gridWidth' in newState) {
+                    gridWidthInput.value = state.gridWidth;
+                }
+                if ('gridHeight' in newState) {
+                    gridHeightInput.value = state.gridHeight;
+                }
+                if ('brushSize' in newState) {
+                    brushSizeValueSpan.textContent = state.brushSize;
+                }
+                if ('zoomLevel' in newState) {
+                    zoomValueSpan.textContent = `${state.zoomLevel.toFixed(1)}x`;
+                    drawGrid();
+                }
+                if ('cellColors' in newState || 'gridLinesVisible' in newState || 'panOffsetX' in newState || 'panOffsetY' in newState) {
+                    drawGrid();
+                }
+                if ('rules' in newState) {
+                    updateRuleUIFromState();
+                }
+                if ('generation' in newState || 'liveCells' in newState || 'fps' in newState) {
+                    updateStatusBar();
+                }
+                if ('historyIndex' in newState || 'history' in newState) {
+                    undoBtn.disabled = state.historyIndex <= 0;
+                    redoBtn.disabled = state.historyIndex >= state.history.length - 1;
+                }
+            }
+
+            // --- Grid Operations ---
+            function getIndex(x, y) {
+                return y * state.gridWidth + x;
+            }
+
+            function initializeGrid(fill = false) {
+                state.currentGrid = new Uint8Array(state.gridWidth * state.gridHeight); // Re-initialize with current dimensions
+                for (let i = 0; i < state.currentGrid.length; i++) {
+                    state.currentGrid[i] = fill ? 1 : 0; // Fill with 'alive' state (1)
+                }
+                state.liveCells = fill ? state.currentGrid.length : 0;
+                state.generation = 0;
+                // Reset pan offset when grid is re-initialized
+                setState({ panOffsetX: 0, panOffsetY: 0 });
+                pushToHistory();
+                updateStatusBar();
+                drawGrid();
+            }
+
+            function randomizeGrid() {
+                pauseSimulation();
+                state.currentGrid = new Uint8Array(state.gridWidth * state.gridHeight);
+                for (let i = 0; i < state.currentGrid.length; i++) {
+                    state.currentGrid[i] = Math.random() > 0.5 ? 1 : 0; // 50% chance for alive (state 1)
+                }
+                state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
+                state.generation = 0;
+                setState({ panOffsetX: 0, panOffsetY: 0 }); // Reset pan on randomize
+                pushToHistory();
+                updateStatusBar();
+                drawGrid();
+            }
+
+            function setCell(x, y, value) {
+                if (x >= 0 && x < state.gridWidth && y >= 0 && y < state.gridHeight) {
+                    const index = getIndex(x, y);
+                    if (state.currentGrid[index] !== value) {
+                        state.currentGrid[index] = value;
+                    }
+                }
+            }
+
+            function drawBrush(gridX, gridY, value) { // Now takes grid coordinates directly
+                const brushRadius = Math.floor((state.brushSize - 1) / 2);
+
+                for (let y = gridY - brushRadius; y <= gridY + brushRadius; y++) {
+                    for (let x = gridX - brushRadius; x <= gridX + brushRadius; x++) {
+                        setCell(x, y, value);
+                    }
+                }
+                drawGrid();
+            }
+
+            // --- Canvas Rendering ---
+            function setupCanvasDimensions() {
+                canvas.width = state.gridWidth * BASE_CELL_SIZE_PX;
+                canvas.height = state.gridHeight * BASE_CELL_SIZE_PX;
+            }
+
+            function drawGrid() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.save();
+                ctx.scale(state.zoomLevel, state.zoomLevel);
+                ctx.translate(state.panOffsetX, state.panOffsetY); // Apply pan offset
+
+                const aliveColor = state.cellColors.alive;
+                const deadColor = state.cellColors.dead;
+                const dyingColor = state.cellColors.dying; // New: Dying color
+                const baseCellSize = BASE_CELL_SIZE_PX;
+
+                for (let y = 0; y < state.gridHeight; y++) {
+                    for (let x = 0; x < state.gridWidth; x++) {
+                        const index = getIndex(x, y);
+                        const cellState = state.currentGrid[index];
+
+                        if (cellState === 1) { // Alive
+                            ctx.fillStyle = aliveColor;
+                        } else if (cellState === 2) { // Dying
+                            ctx.fillStyle = dyingColor;
+                        } else { // Dead (0)
+                            ctx.fillStyle = deadColor;
+                        }
+                        ctx.fillRect(x * baseCellSize, y * baseCellSize, baseCellSize, baseCellSize);
+                    }
+                }
+
+                if (state.gridLinesVisible && (baseCellSize * state.zoomLevel) > 5) {
+                    ctx.strokeStyle = 'rgba(100, 100, 100, 0.5)';
+                    ctx.lineWidth = 0.5 / state.zoomLevel;
+
+                    for (let x = 0; x <= state.gridWidth; x++) {
+                        ctx.beginPath();
+                        ctx.moveTo(x * baseCellSize, 0);
+                        ctx.lineTo(x * baseCellSize, state.gridHeight * baseCellSize);
+                        ctx.stroke();
+                    }
+                    for (let y = 0; y <= state.gridHeight; y++) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, y * baseCellSize);
+                        ctx.lineTo(state.gridWidth * baseCellSize, y * baseCellSize);
+                        ctx.stroke();
+                    }
+                }
+
+                ctx.restore();
+            }
+
+            // --- Simulation Loop ---
+            function gameLoop(timestamp) {
+                if (!state.simulationRunning) {
+                    return;
+                }
+
+                if (state.lastFpsUpdateTime === 0) {
+                    state.lastFpsUpdateTime = timestamp;
+                }
+
+                state.fpsFrameCount++;
+                const now = performance.now();
+                if (now - state.lastFpsUpdateTime >= 1000) { // Update FPS every second
+                    state.fps = (state.fpsFrameCount * 1000) / (now - state.lastFpsUpdateTime);
+                    state.lastFpsUpdateTime = now;
+                    state.fpsFrameCount = 0;
+                }
+
+                if (state.frameCounter > state.framesToSkip) {
+                    state.frameCounter = 0;
+                    worker.postMessage({
+                        type: 'compute',
+                        payload: {
+                            currentGrid: state.currentGrid,
+                            birthRules: Array.from(state.rules.birth),
+                            survivalRules: Array.from(state.rules.survival),
+                            neighborhoodType: state.rules.neighborhood,
+                            boundaryType: state.rules.boundary
+                        }
+                    }, [state.currentGrid.buffer]);
+                } else {
+                    state.animationFrameId = requestAnimationFrame(gameLoop);
+                }
+            }
+
+            // --- Simulation Controls ---
+            function startSimulation() {
+                if (!state.simulationRunning) {
+                    setState({ simulationRunning: true });
+                    state.animationFrameId = requestAnimationFrame(gameLoop);
+                }
+            }
+
+            function pauseSimulation() {
+                if (state.simulationRunning) {
+                    setState({ simulationRunning: false });
+                    if (state.animationFrameId) {
+                        cancelAnimationFrame(state.animationFrameId);
+                        state.animationFrameId = null;
+                    }
+                }
+            }
+
+            function stepSimulation() {
+                if (!state.simulationRunning) {
+                    worker.postMessage({
+                        type: 'compute',
+                        payload: {
+                            currentGrid: state.currentGrid,
+                            birthRules: Array.from(state.rules.birth),
+                            survivalRules: Array.from(state.rules.survival),
+                            neighborhoodType: state.rules.neighborhood,
+                            boundaryType: state.rules.boundary
+                        }
+                    }, [state.currentGrid.buffer]);
+                }
+            }
+
+            function resetSimulation() {
+                pauseSimulation();
+                initializeGrid(false); // This will call pushToHistory
+                setState({ generation: 0, liveCells: 0, fps: 0 });
+            }
+
+            function pushToHistory(gridToSave = state.currentGrid) {
+                if (state.historyIndex < state.history.length - 1) {
+                    state.history.splice(state.historyIndex + 1);
+                }
+
+                state.history.push(new Uint8Array(gridToSave));
+
+                if (state.history.length > MAX_HISTORY_SIZE) {
+                    state.history.shift();
+                }
+
+                state.historyIndex = state.history.length - 1;
+
+                setState({});
+            }
+
+            function undo() {
+                if (state.historyIndex > 0) {
+                    pauseSimulation();
+                    state.historyIndex--;
+                    state.currentGrid = new Uint8Array(state.history[state.historyIndex]);
+                    state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
+                    state.generation--;
+                    if (state.generation < 0) state.generation = 0;
+                    updateStatusBar();
+                    drawGrid();
+                    setState({});
+                } else {
+                    showToast('No more history to undo.', 'info');
+                }
+            }
+
+            function redo() {
+                if (state.historyIndex < state.history.length - 1) {
+                    pauseSimulation();
+                    state.historyIndex++;
+                    state.currentGrid = new Uint8Array(state.history[state.historyIndex]);
+                    state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
+                    state.generation++;
+                    updateStatusBar();
+                    drawGrid();
+                    setState({});
+                } else {
+                    showToast('No more history to redo.', 'info');
+                }
+            }
+
+            function applyGridSize() {
+                const newWidth = parseInt(gridWidthInput.value);
+                const newHeight = parseInt(gridHeightInput.value);
+
+                if (isNaN(newWidth) || isNaN(newHeight) || newWidth < 10 || newHeight < 5 || newWidth > 500 || newHeight > 500) {
+                    showToast("Please enter valid grid dimensions (min 10, max 500).", 'error');
+                    return;
+                }
+
+                if (newWidth === state.gridWidth && newHeight === state.gridHeight) {
+                    showToast("Grid size is already " + newWidth + "x" + newHeight + ".", 'info');
+                    return;
+                }
+
+                pauseSimulation();
+                setState({ gridWidth: newWidth, gridHeight: newHeight });
+                setupCanvasDimensions();
+                initializeGrid(false);
+                worker.postMessage({ type: 'init', payload: { gridWidth: state.gridWidth, gridHeight: state.gridHeight } });
+                drawGrid();
+                showToast('Grid size applied!', 'success');
+            }
+
+            // --- Rule Engine ---
+            function parseRuleString(ruleString) {
+                const match = ruleString.match(/B(\d*)\/S(\d*)/i);
+                if (!match) return null;
+
+                const birthStr = match[1];
+                const survivalStr = match[2];
+
+                const birth = new Set(birthStr.split('').map(Number).filter(n => n >= 0 && n <= 8));
+                const survival = new Set(survivalStr.split('').map(Number).filter(n => n >= 0 && n <= 8));
+
+                return { birth, survival };
+            }
+
+            function generateRuleString(birthSet, survivalSet) {
+                const sortedBirth = Array.from(birthSet).sort((a, b) => a - b).join('');
+                const sortedSurvival = Array.from(survivalSet).sort((a, b) => a - b).join('');
+                return `B${sortedBirth}/S${sortedSurvival}`;
+            }
+
+            function updateRuleUIFromState() {
+                ruleInput.value = generateRuleString(state.rules.birth, state.rules.survival);
+
+                neighborhoodTypeRadios.forEach(radio => {
+                    radio.checked = radio.value === state.rules.neighborhood;
+                });
+
+                boundaryTypeRadios.forEach(radio => {
+                    radio.checked = radio.value === state.rules.boundary;
+                });
+
+                for (let i = 0; i <= 8; i++) {
+                    const birthCheckbox = document.getElementById(`birth-${i}`);
+                    if (birthCheckbox) birthCheckbox.checked = state.rules.birth.has(i);
+
+                    const survivalCheckbox = document.getElementById(`survival-${i}`);
+                    if (survivalCheckbox) survivalCheckbox.checked = state.rules.survival.has(i);
+                }
+            }
+
+            function createRuleCheckboxes(container, type) {
+                for (let i = 0; i <= 8; i++) {
+                    const label = document.createElement('label');
+                    label.className = 'rule-checkbox-item';
+                    label.innerHTML = `
+                        <input type="checkbox" id="${type}-${i}" value="${i}" aria-label="${type} condition for ${i} neighbors">
+                        <span>${i}</span>
+                    `;
+                    label.querySelector('input').addEventListener('change', (e) => {
+                        const num = Number(e.target.value);
+                        const newRules = { ...state.rules };
+                        newRules[type] = new Set(state.rules[type]);
+                        if (e.target.checked) {
+                            newRules[type].add(num);
+                        } else {
+                            newRules[type].delete(num);
+                        }
+                        setState({ rules: newRules });
+                    });
+                    container.appendChild(label);
+                }
+            }
+
+            // --- Pattern Presets ---
+            const presets = {
+                glider: [
+                    [1, 0, 0],
+                    [0, 1, 1],
+                    [1, 1, 0]
+                ],
+                lightWeightSpaceship: [
+                    [0, 1, 1, 0, 0],
+                    [1, 1, 1, 1, 0],
+                    [1, 1, 0, 1, 1],
+                    [0, 0, 1, 1, 0]
+                ],
+                gosperGliderGun: [
+                    [0,4],[1,4],[0,5],[1,5],
+                    [10,4],[11,4],[10,5],[11,5],[10,6],[12,3],[12,7],[13,2],[13,8],[14,2],[14,8],[15,5],[16,3],[16,7],[17,4],[17,5],[17,6],
+                    [20,2],[21,2],[20,3],[21,3],[20,4],[22,1],[22,5],[24,0],[24,1],[24,5],[24,6],
+                    [34,2],[35,2],[34,3],[35,3]
+                ],
+                pulsar: [
+                    [2,0],[3,0],[4,0],[8,0],[9,0],[10,0],
+                    [0,2],[5,2],[7,2],[12,2],
+                    [0,3],[5,3],[7,3],[12,3],
+                    [0,4],[5,4],[7,4],[12,4],
+                    [2,5],[3,5],[4,5],[8,5],[9,5],[10,5],
+
+                    [2,7],[3,7],[4,7],[8,7],[9,7],[10,7],
+                    [0,8],[5,8],[7,8],[12,8],
+                    [0,9],[5,9],[7,9],[12,9],
+                    [0,10],[5,10],[7,10],[12,10],
+                    [2,12],[3,12],[4,12],[8,12],[9,12],[10,12]
+                ],
+                tenCellRow: [
+                    [0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0]
+                ]
+            };
+
+            function loadPreset(presetName) {
+                const pattern = presets[presetName];
+                if (!pattern) return;
+
+                pauseSimulation();
+                initializeGrid(false);
+
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                let patternCells = [];
+
+                if (Array.isArray(pattern[0])) { // 2D array representation
+                    pattern.forEach((row, y) => {
+                        row.forEach((cell, x) => {
+                            if (cell === 1) {
+                                patternCells.push([x, y]);
+                                if (x < minX) minX = x;
+                                if (y < minY) minY = y;
+                                if (x > maxX) maxX = x;
+                                if (y > maxY) maxY = y;
+                            }
+                        });
+                    });
+                } else { // Array of [x,y] coordinates
+                    patternCells = pattern;
+                    pattern.forEach(([x, y]) => {
+                        if (x < minX) minX = x;
+                        if (y < minY) minY = y;
+                        if (x > maxX) maxX = x;
+                        if (y > maxY) maxY = y;
+                    });
+                }
+
+                if (patternCells.length === 0) return;
+
+                const patternWidth = maxX - minX + 1;
+                const patternHeight = maxY - minY + 1;
+
+                // Calculate offset to center the pattern on the current grid dimensions
+                const offsetX = Math.floor((state.gridWidth - patternWidth) / 2) - minX;
+                const offsetY = Math.floor((state.gridHeight - patternHeight) / 2) - minY;
+
+                patternCells.forEach(([x, y]) => {
+                    setCell(offsetX + x, offsetY + y, 1); // Set to 'alive' state (1)
+                });
+
+                state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
+                state.generation = 0;
+                pushToHistory();
+                updateStatusBar();
+                drawGrid();
+                showToast(`Preset "${presetName}" loaded!`, 'success');
+            }
+
+            // --- Persistence (Local Storage & URL Hash) ---
+            function saveCurrentPattern(patternName) {
+                const patternData = {
+                    grid: Array.from(state.currentGrid),
+                    rules: {
+                        birth: Array.from(state.rules.birth),
+                        survival: Array.from(state.rules.survival),
+                        neighborhood: state.rules.neighborhood,
+                        boundary: state.rules.boundary
+                    },
+                    cellColors: { // Save all 3 colors
+                        alive: state.cellColors.alive,
+                        dead: state.cellColors.dead,
+                        dying: state.cellColors.dying
+                    },
+                    gridWidth: state.gridWidth,
+                    gridHeight: state.gridHeight
+                };
+
+                state.savedPatterns[patternName] = patternData;
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.savedPatterns));
+            }
+
+            function loadSavedPatterns() {
+                const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (saved) {
+                    state.savedPatterns = JSON.parse(saved);
+                } else {
+                    state.savedPatterns = {};
+                }
+                loadSavedPatternsToModal();
+                loadPatternModal.classList.remove('hidden');
+                setTimeout(() => loadPatternModal.classList.add('show'), 10);
+            }
+
+            function loadSavedPatternsToModal() {
+                modalSavedPatternsList.innerHTML = '';
+                const patternNames = Object.keys(state.savedPatterns);
+
+                if (patternNames.length === 0) {
+                    modalSavedPatternsList.innerHTML = '<p class="text-gray-400">No saved patterns found.</p>';
+                    return;
+                }
+
+                patternNames.forEach(name => {
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center py-1 border-b border-gray-600 last:border-b-0';
+                    const patternInfo = state.savedPatterns[name];
+                    const dimensions = patternInfo.gridWidth && patternInfo.gridHeight ? ` (${patternInfo.gridWidth}x${patternInfo.gridHeight})` : '';
+                    div.innerHTML = `
+                        <span class="text-gray-200">${name}${dimensions}</span>
+                        <div>
+                            <button class="btn-secondary text-xs px-2 py-1 mr-2 load-btn" data-pattern-name="${name}" aria-label="Load pattern ${name}">Load</button>
+                            <button class="btn-secondary text-xs px-2 py-1 delete-btn" data-pattern-name="${name}" aria-label="Delete pattern ${name}">Delete</button>
+                        </div>
+                    `;
+                    modalSavedPatternsList.appendChild(div);
+                });
+
+                modalSavedPatternsList.querySelectorAll('.load-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const name = e.target.dataset.patternName;
+                        const patternData = state.savedPatterns[name];
+                        if (patternData) {
+                            pauseSimulation();
+                            // If pattern has saved dimensions, apply them first
+                            if (patternData.gridWidth && patternData.gridHeight) {
+                                const newWidth = Math.max(10, Math.min(500, parseInt(patternData.gridWidth)));
+                                const newHeight = Math.max(10, Math.min(500, parseInt(patternData.gridHeight)));
+                                if (!isNaN(newWidth) && !isNaN(newHeight)) {
+                                    setState({ gridWidth: newWidth, gridHeight: newHeight });
+                                    setupCanvasDimensions();
+                                    worker.postMessage({ type: 'init', payload: { gridWidth: state.gridWidth, gridHeight: state.gridHeight } });
+                                }
+                            }
+
+                            let newCurrentGrid = new Uint8Array(state.gridWidth * state.gridHeight);
+                            const loadedGrid = new Uint8Array(patternData.grid);
+                            const sourceWidth = patternData.gridWidth || state.gridWidth;
+                            const sourceHeight = patternData.gridHeight || state.gridHeight;
+
+                            for (let y = 0; y < Math.min(sourceHeight, state.gridHeight); y++) {
+                                for (let x = 0; x < Math.min(sourceWidth, state.gridWidth); x++) {
+                                    const loadedIndex = y * sourceWidth + x;
+                                    const currentIndex = y * state.gridWidth + x;
+                                    if (loadedIndex < loadedGrid.length && currentIndex < newCurrentGrid.length) {
+                                        newCurrentGrid[currentIndex] = loadedGrid[loadedIndex];
+                                    }
+                                }
+                            }
+
+                            setState({
+                                currentGrid: newCurrentGrid,
+                                rules: {
+                                    birth: new Set(patternData.rules.birth),
+                                    survival: new Set(patternData.rules.survival),
+                                    neighborhood: patternData.rules.neighborhood,
+                                    boundary: patternData.rules.boundary || 'toroidal'
+                                },
+                                cellColors: { // Load all 3 colors
+                                    alive: patternData.cellColors.alive,
+                                    dead: patternData.cellColors.dead,
+                                    dying: patternData.cellColors.dying || '#FF8C00' // Default if not present
+                                }
+                            });
+                            state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
+                            state.generation = 0;
+                            pushToHistory();
+                            updateStatusBar();
+                            drawGrid();
+                            loadPatternModal.classList.remove('show');
+                            loadPatternModal.addEventListener('transitionend', function handler() {
+                                loadPatternModal.classList.add('hidden');
+                                loadPatternModal.removeEventListener('transitionend', handler);
+                            }, { once: true });
+                            showToast(`Pattern "${name}" loaded!`, 'success');
+                        }
+                    });
+                });
+
+                modalSavedPatternsList.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const name = e.target.dataset.patternName;
+                        if (confirm(`Are you sure you want to delete "${name}"?`)) {
+                            delete state.savedPatterns[name];
+                            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state.savedPatterns));
+                            loadSavedPatternsToModal();
+                            showToast(`Pattern "${name}" deleted!`, 'info');
+                        }
+                    });
+                });
+            }
+
+            function encodeStateToUrl() {
+                let rleGrid = '';
+                let count = 0;
+                let lastState = -1; // Use -1 to ensure first cell starts a new run
+
+                for (let i = 0; i < state.currentGrid.length; i++) {
+                    const currentState = state.currentGrid[i];
+                    if (currentState !== lastState) {
+                        if (count > 0) {
+                            rleGrid += `${count}${lastState}`;
+                        }
+                        lastState = currentState;
+                        count = 1;
+                    } else {
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    rleGrid += `${count}${lastState}`;
+                }
+                const encodedGrid = btoa(rleGrid);
+
+                const ruleStr = generateRuleString(state.rules.birth, state.rules.survival);
+                const neighborhood = state.rules.neighborhood;
+                const boundary = state.rules.boundary;
+                const aliveColor = state.cellColors.alive.replace('#', '');
+                const deadColor = state.cellColors.dead.replace('#', '');
+                const dyingColor = state.cellColors.dying.replace('#', ''); // New: Dying color
+                const gridLines = state.gridLinesVisible ? 1 : 0;
+                const zoom = state.zoomLevel.toFixed(1);
+                const gridWidth = state.gridWidth;
+                const gridHeight = state.gridHeight;
+                const panX = Math.round(state.panOffsetX); // Round to avoid long decimals
+                const panY = Math.round(state.panOffsetY); // Round to avoid long decimals
+
+
+                const params = new URLSearchParams();
+                params.append('g', encodedGrid);
+                params.append('r', ruleStr);
+                params.append('n', neighborhood);
+                params.append('b', boundary);
+                params.append('ac', aliveColor);
+                params.append('dc', deadColor);
+                params.append('dyc', dyingColor); // New: Append dying color
+                params.append('gl', gridLines);
+                params.append('z', zoom);
+                params.append('gw', gridWidth);
+                params.append('gh', gridHeight);
+                params.append('px', panX); // New: Append pan X
+                params.append('py', panY); // New: Append pan Y
+
+                const url = window.location.origin + window.location.pathname + '#' + params.toString();
+                navigator.clipboard.writeText(url).then(() => {
+                    showToast('Share link copied!', 'success');
+                }).catch(err => {
+                    console.error('Failed to copy URL:', err);
+                    showToast('Failed to copy URL to clipboard. Please copy from address bar manually.', 'error');
+                });
+            }
+
+            function decodeStateFromUrl() {
+                const hash = window.location.hash.substring(1);
+                if (!hash) return false;
+
+                try {
+                    const params = new URLSearchParams(hash);
+                    const encodedGrid = params.get('g');
+                    const ruleStr = params.get('r');
+                    const neighborhood = params.get('n');
+                    const boundary = params.get('b');
+                    const aliveColor = params.get('ac');
+                    const deadColor = params.get('dc');
+                    const dyingColor = params.get('dyc'); // New: Get dying color
+                    const gridLines = params.get('gl');
+                    const zoom = params.get('z');
+                    const loadedGridWidth = params.get('gw');
+                    const loadedGridHeight = params.get('gh');
+                    const panX = params.get('px'); // New: Get pan X
+                    const panY = params.get('py'); // New: Get pan Y
+
+                    // Apply grid dimensions first if they exist in the URL
+                    let tempGridWidth = state.gridWidth;
+                    let tempGridHeight = state.gridHeight;
+
+                    if (loadedGridWidth && loadedGridHeight) {
+                        const parsedWidth = parseInt(loadedGridWidth);
+                        const parsedHeight = parseInt(loadedGridHeight);
+                        if (!isNaN(parsedWidth) && !isNaN(parsedHeight) && parsedWidth >=10 && parsedHeight >=10 && parsedWidth <= 500 && parsedHeight <= 500) {
+                            tempGridWidth = parsedWidth;
+                            tempGridHeight = parsedHeight;
+                            setState({ gridWidth: tempGridWidth, gridHeight: tempGridHeight });
+                            setupCanvasDimensions();
+                            worker.postMessage({ type: 'init', payload: { gridWidth: state.gridWidth, gridHeight: state.gridHeight } });
+                        }
+                    }
+
+                    if (encodedGrid) {
+                        const decodedRleGrid = atob(encodedGrid);
+                        let decodedGridArray = new Uint8Array(tempGridWidth * tempGridHeight);
+                        let currentIdx = 0;
+                        let num = '';
+                        for (let i = 0; i < decodedRleGrid.length; i++) {
+                            const char = decodedRleGrid[i];
+                            if (char === '0' || char === '1' || char === '2') { // Allow decoding state 2
+                                const count = parseInt(num);
+                                const stateValue = parseInt(char);
+                                for (let j = 0; j < count && currentIdx < decodedGridArray.length; j++) {
+                                    decodedGridArray[currentIdx++] = stateValue;
+                                }
+                                num = '';
+                            } else {
+                                num += char;
+                            }
+                        }
+                        let finalGrid = new Uint8Array(state.gridWidth * state.gridHeight);
+                        const copyLength = Math.min(decodedGridArray.length, finalGrid.length);
+                        finalGrid.set(decodedGridArray.slice(0, copyLength));
+                        setState({ currentGrid: finalGrid });
+                    }
+
+                    if (ruleStr) {
+                        const parsedRules = parseRuleString(ruleStr);
+                        if (parsedRules) {
+                            setState({
+                                rules: {
+                                    ...state.rules,
+                                    birth: parsedRules.birth,
+                                    survival: parsedRules.survival
+                                }
+                            });
+                        }
+                    }
+
+                    if (neighborhood && (neighborhood === 'moore' || neighborhood === 'vonNeumann')) {
+                        setState({ rules: { ...state.rules, neighborhood: neighborhood } });
+                    }
+
+                    if (boundary && (boundary === 'toroidal' || boundary === 'finite')) {
+                        setState({ rules: { ...state.rules, boundary: boundary } });
+                    }
+
+                    if (aliveColor) setState({ cellColors: { ...state.cellColors, alive: `#${aliveColor}` } });
+                    if (deadColor) setState({ cellColors: { ...state.cellColors, dead: `#${deadColor}` } });
+                    if (dyingColor) setState({ cellColors: { ...state.cellColors, dying: `#${dyingColor}` } }); // New: apply dying color
+                    if (gridLines !== null) setState({ gridLinesVisible: gridLines === '1' });
+                    if (zoom) setState({ zoomLevel: parseFloat(zoom) });
+                    if (panX !== null && panY !== null) setState({ panOffsetX: parseFloat(panX), panOffsetY: parseFloat(panY) }); // New: apply pan
+
+                    state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
+                    state.generation = 0;
+                    pushToHistory();
+                    updateStatusBar();
+                    drawGrid();
+                    showToast('State loaded from URL!', 'info');
+                    return true;
+                } catch (e) {
+                    console.error("Failed to decode state from URL:", e);
+                    showToast('Failed to load state from URL. Invalid link.', 'error');
+                    return false;
+                }
+            }
+
+
+            // --- Status Bar Update ---
+            function updateStatusBar() {
+                generationCountSpan.textContent = state.generation;
+                liveCellCountSpan.textContent = state.liveCells;
+                fpsCountSpan.textContent = state.fps.toFixed(0);
+            }
+
+            // --- Toast Notification System ---
+            function showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+
+                void toast.offsetWidth; // Force reflow
+
+                toast.classList.add('show');
+
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    toast.classList.add('hide');
+                    toast.addEventListener('transitionend', () => {
+                        toast.remove();
+                    }, { once: true });
+                }, TOAST_DISPLAY_TIME);
+            }
+
+            // --- Responsive Panel Logic ---
+            function togglePanel(contentElement, toggleButton) {
+                const isExpanded = contentElement.classList.toggle('expanded');
+                const svg = toggleButton.querySelector('svg');
+                if (isExpanded) {
+                    svg.classList.remove('rotate-90');
+                } else {
+                    svg.classList.add('rotate-90');
+                }
+            }
+
+            function setPanelStateBasedOnWidth() {
+                if (window.innerWidth > 1024) {
+                    // Desktop view: ensure panels are fully visible and toggle buttons are hidden
+                    controlPanelContent.classList.add('expanded');
+                    controlPanelToggleBtn.querySelector('svg').classList.remove('rotate-90');
+                    controlPanelToggleBtn.classList.add('hidden');
+                    ruleEditorPanelContent.classList.add('expanded');
+                    ruleEditorPanelToggleBtn.querySelector('svg').classList.remove('rotate-90');
+                    ruleEditorPanelToggleBtn.classList.add('hidden');
+                } else {
+                    // Mobile view: ensure panels are collapsed and toggle buttons are visible
+                    controlPanelContent.classList.remove('expanded');
+                    controlPanelToggleBtn.querySelector('svg').classList.add('rotate-90');
+                    controlPanelToggleBtn.classList.remove('hidden');
+                    ruleEditorPanelContent.classList.remove('expanded');
+                    ruleEditorPanelToggleBtn.querySelector('svg').classList.add('rotate-90');
+                    ruleEditorPanelToggleBtn.classList.remove('hidden');
+                }
+            }
+
+
+            // --- Event Listeners Setup ---
+            function setupEventListeners() {
+                // Simulation Controls
+                playPauseBtn.addEventListener('click', () => {
+                    if (state.simulationRunning) {
+                        pauseSimulation();
+                    } else {
+                        startSimulation();
+                    }
+                });
+                stepBtn.addEventListener('click', stepSimulation);
+                resetBtn.addEventListener('click', resetSimulation);
+
+                // Undo/Redo
+                undoBtn.addEventListener('click', undo);
+                redoBtn.addEventListener('click', redo);
+
+                speedSlider.addEventListener('input', (e) => {
+                    setState({ simulationSpeed: Number(e.target.value) });
+                });
+
+                // Grid Dimensions
+                applyGridSizeBtn.addEventListener('click', applyGridSize);
+
+                // Drawing Tools
+                brushSizeSlider.addEventListener('input', (e) => {
+                    setState({ brushSize: Number(e.target.value) });
+                });
+                fillGridBtn.addEventListener('click', () => {
+                    initializeGrid(true);
+                    showToast('Grid filled with live cells!', 'success');
+                });
+                clearGridBtn.addEventListener('click', () => {
+                    initializeGrid(false);
+                    showToast('Grid cleared!', 'success');
+                });
+                randomizeGridBtn.addEventListener('click', () => {
+                    randomizeGrid();
+                    showToast('Grid randomized!', 'success');
+                });
+
+                // Canvas Drawing & Panning Interaction
+                let lastGridX = -1, lastGridY = -1;
+                canvas.addEventListener('mousedown', (e) => {
+                    if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle click or Shift + Left click for panning
+                        state.isPanning = true;
+                        state.lastPanX = e.clientX;
+                        state.lastPanY = e.clientY;
+                        canvas.classList.add('grabbing');
+                        e.preventDefault();
+                    } else if (e.button === 0 || e.button === 2) { // Left or Right click for drawing
+                        state.isDrawing = true;
+                        state.drawMode = (e.button === 0) ? 1 : 0; // 1 for alive, 0 for dead
+                        const rect = canvas.getBoundingClientRect();
+                        const clientX = e.clientX - rect.left;
+                        const clientY = e.clientY - rect.top;
+
+                        // Convert client coordinates to grid coordinates, accounting for zoom and pan
+                        const gridX = Math.floor(((clientX / state.zoomLevel) - state.panOffsetX) / BASE_CELL_SIZE_PX);
+                        const gridY = Math.floor(((clientY / state.zoomLevel) - state.panOffsetY) / BASE_CELL_SIZE_PX);
+
+                        drawBrush(gridX, gridY, state.drawMode);
+                        lastGridX = gridX;
+                        lastGridY = gridY;
+                        e.preventDefault();
+                    }
+                });
+                canvas.addEventListener('mousemove', (e) => {
+                    if (state.isPanning) {
+                        const dx = e.clientX - state.lastPanX;
+                        const dy = e.clientY - state.lastPanY;
+                        setState({
+                            panOffsetX: state.panOffsetX + dx / state.zoomLevel,
+                            panOffsetY: state.panOffsetY + dy / state.zoomLevel,
+                            lastPanX: e.clientX,
+                            lastPanY: e.clientY
+                        });
+                    } else if (state.isDrawing) {
+                        const rect = canvas.getBoundingClientRect();
+                        const clientX = e.clientX - rect.left;
+                        const clientY = e.clientY - rect.top;
+
+                        const currentGridX = Math.floor(((clientX / state.zoomLevel) - state.panOffsetX) / BASE_CELL_SIZE_PX);
+                        const currentGridY = Math.floor(((clientY / state.zoomLevel) - state.panOffsetY) / BASE_CELL_SIZE_PX);
+
+                        if (currentGridX !== lastGridX || currentGridY !== lastGridY) {
+                            drawBrush(currentGridX, currentGridY, state.drawMode);
+                            lastGridX = currentGridX;
+                            lastGridY = currentGridY;
+                        }
+                    }
+                });
+                canvas.addEventListener('mouseup', () => {
+                    if (state.isPanning) {
+                        state.isPanning = false;
+                        canvas.classList.remove('grabbing');
+                    } else if (state.isDrawing) {
+                        state.isDrawing = false;
+                        state.liveCells = Array.from(state.currentGrid).filter(c => c === 1).length;
+                        pushToHistory();
+                        updateStatusBar();
+                    }
+                });
+                canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+                // Mouse wheel zoom
+                canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomChange = e.deltaY * -0.001;
+                    let newZoom = state.zoomLevel + zoomChange;
+                    newZoom = Math.max(parseFloat(zoomSlider.min), Math.min(parseFloat(zoomSlider.max), newZoom));
+                    newZoom = Math.round(newZoom / parseFloat(zoomSlider.step)) * parseFloat(zoomSlider.step);
+                    setState({ zoomLevel: newZoom });
+                    zoomSlider.value = newZoom;
+                });
+
+                // Keyboard Shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                        return; // Don't interfere with typing
+                    }
+
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        playPauseBtn.click();
+                    } else if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        stepBtn.click();
+                    } else if (e.key === 'r' || e.key === 'R') {
+                        e.preventDefault();
+                        resetBtn.click();
+                    } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') { // Ctrl+Z or Cmd+Z
+                        e.preventDefault();
+                        undoBtn.click();
+                    } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { // Ctrl+Y or Cmd+Y
+                        e.preventDefault();
+                        redoBtn.click();
+                    }
+                });
+
+
+                // Rule Editor
+                ruleInput.addEventListener('input', (e) => {
+                    const parsed = parseRuleString(e.target.value);
+                    if (parsed) {
+                        setState({ rules: { ...state.rules, birth: parsed.birth, survival: parsed.survival } });
+                    }
+                });
+                neighborhoodTypeRadios.forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        setState({ rules: { ...state.rules, neighborhood: e.target.value } });
+                    });
+                });
+                boundaryTypeRadios.forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        setState({ rules: { ...state.rules, boundary: e.target.value } });
+                    });
+                });
+
+                // Visual Settings
+                aliveColorPicker.addEventListener('input', (e) => {
+                    setState({ cellColors: { ...state.cellColors, alive: e.target.value } });
+                });
+                dyingColorPicker.addEventListener('input', (e) => { // New: Dying color picker listener
+                    setState({ cellColors: { ...state.cellColors, dying: e.target.value } });
+                });
+                deadColorPicker.addEventListener('input', (e) => {
+                    setState({ cellColors: { ...state.cellColors, dead: e.target.value } });
+                });
+                gridLinesToggle.addEventListener('change', (e) => {
+                    setState({ gridLinesVisible: e.target.checked });
+                });
+                zoomSlider.addEventListener('input', (e) => {
+                    setState({ zoomLevel: Number(e.target.value) });
+                });
+                shareLinkBtn.addEventListener('click', encodeStateToUrl);
+
+                // Pattern Presets & Persistence
+                presetSelect.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        loadPreset(e.target.value);
+                        e.target.value = '';
+                    }
+                });
+                savePatternBtn.addEventListener('click', () => {
+                    // Show the custom save pattern modal
+                    savePatternNameInput.value = ''; // Clear previous input
+                    savePatternModal.classList.remove('hidden');
+                    setTimeout(() => savePatternModal.classList.add('show'), 10);
+                    savePatternNameInput.focus(); // Focus input for immediate typing
+                });
+
+                confirmSavePatternBtn.addEventListener('click', () => {
+                    const patternName = savePatternNameInput.value.trim();
+                    if (!patternName) {
+                        showToast('Pattern name cannot be empty.', 'error');
+                        return;
+                    }
+                    if (state.savedPatterns[patternName]) {
+                        if (!confirm(`A pattern named "${patternName}" already exists. Overwrite?`)) {
+                            showToast('Pattern save cancelled (overwrite).', 'info');
+                            closeSavePatternModal();
+                            return;
+                        }
+                    }
+                    saveCurrentPattern(patternName);
+                    showToast(`Pattern "${patternName}" saved!`, 'success');
+                    closeSavePatternModal();
+                });
+
+                cancelSavePatternBtn.addEventListener('click', () => {
+                    showToast('Pattern save cancelled.', 'info');
+                    closeSavePatternModal();
+                });
+
+                function closeSavePatternModal() {
+                    savePatternModal.classList.remove('show');
+                    savePatternModal.addEventListener('transitionend', function handler() {
+                        savePatternModal.classList.add('hidden');
+                        savePatternModal.removeEventListener('transitionend', handler);
+                    }, { once: true });
+                }
+
+                loadPatternBtn.addEventListener('click', loadSavedPatterns);
+                closeModalBtn.addEventListener('click', () => {
+                    loadPatternModal.classList.remove('show');
+                    loadPatternModal.addEventListener('transitionend', function handler() {
+                        loadPatternModal.classList.add('hidden');
+                        loadPatternModal.removeEventListener('transitionend', handler);
+                    }, { once: true });
+                });
+
+                // Responsive Panel Toggles
+                controlPanelToggleBtn.addEventListener('click', () => togglePanel(controlPanelContent, controlPanelToggleBtn));
+                ruleEditorPanelToggleBtn.addEventListener('click', () => togglePanel(ruleEditorPanelContent, ruleEditorPanelToggleBtn));
+                window.addEventListener('resize', setPanelStateBasedOnWidth);
+            }
+
+            // --- Initialization Function ---
+            function init() {
+                gridWidthInput.value = state.gridWidth;
+                gridHeightInput.value = state.gridHeight;
+
+                setupCanvasDimensions();
+                setupWorker();
+                initializeGrid(false);
+
+                setupEventListeners();
+                createRuleCheckboxes(birthConditionsDiv, 'birth');
+                createRuleCheckboxes(survivalConditionsDiv, 'survival');
+
+                const urlStateLoaded = decodeStateFromUrl();
+
+                if (!urlStateLoaded) {
+                    updateRuleUIFromState();
+                    aliveColorPicker.value = state.cellColors.alive;
+                    dyingColorPicker.value = state.cellColors.dying; // Set initial dying color
+                    deadColorPicker.value = state.cellColors.dead;
+                    gridLinesToggle.checked = state.gridLinesVisible;
+                    speedSlider.value = state.simulationSpeed;
+                    brushSizeSlider.value = state.brushSize;
+                    zoomSlider.value = state.zoomLevel;
+                    setState({
+                        simulationSpeed: state.simulationSpeed,
+                        brushSize: state.brushSize,
+                        zoomLevel: state.zoomLevel,
+                        history: state.history,
+                        historyIndex: state.historyIndex,
+                        panOffsetX: state.panOffsetX, // Ensure initial pan is set
+                        panOffsetY: state.panOffsetY
+                    });
+                    drawGrid();
+                }
+
+                // Set initial panel state based on screen width
+                setPanelStateBasedOnWidth();
+            }
+
+            document.addEventListener('DOMContentLoaded', init);
+        })();
+    </script>
+
+    <div style="position:fixed;bottom:5px;right:5px;color:#9ca3af;font-family:sans-serif;font-size:10px;text-align:right;">
+        <a href="#" class="hover:text-blue-400">Cellular Cosmos Sandbox</a><br>
+        <span class="text-gray-500">Powered by Holy Grail. A Dakota Rain Lock Invention.</span>
+    </div>
+
+
+    <div style="position:fixed;bottom:10px;right:10px;background:rgba(0,0,0,0.7);color:white;padding:5px 10px;border-radius:5px;font-family:sans-serif;font-size:12px">
+        Created by Dakota Rain Lock, powered by Holy Grail. A Dakota Rain Lock Invention.
+    </div>
+    
+</body>
+</html>
