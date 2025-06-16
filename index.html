@@ -157,7 +157,7 @@
             <h2 class="section-title">Cellular Automata Rules</h2>
             <div>
                 <label for="ruleInput" class="slider-label">Rule (B/S notation):</label>
-                <input type="text" id="ruleInput" value="B13/S23" class="input-field" aria-label="Cellular automata rule in B slash S notation, e.g., B3/S23 for Game of Life">
+                <input type="text" id="ruleInput" value="B13/S23" class="input-field" aria-label="Cellular automata rule in B slash S notation, e.g., B13/S23 for Dakota' Game of Life">
                 <p class="text-xs text-gray-400 mt-1">Example: B13/S23 (Dakota's Game of Life)</p>
             </div>
 
@@ -660,7 +660,7 @@
             }
 
             // --- Rule Engine ---
-            // Parses a rule string (e.g., "B3/S23") into birth and survival rule sets.
+            // Parses a rule string (e.g., "B13/S23") into birth and survival rule sets.
             function parseRuleString(ruleString) {
                 const match = ruleString.match(/B(\d*)\/S(\d*)/i);
                 if (!match) return null; // Return null if the string format is invalid
@@ -675,7 +675,7 @@
                 return { birth, survival };
             }
 
-            // Generates a rule string (e.g., "B3/S23") from birth and survival rule sets.
+            // Generates a rule string (e.g., "B13/S23") from birth and survival rule sets.
             function generateRuleString(birthSet, survivalSet) {
                 // Sort numbers for consistent output
                 const sortedBirth = Array.from(birthSet).sort((a, b) => a - b).join('');
